@@ -15,18 +15,43 @@ fallback.
 
 ## Architecture
 
-```
-┌────────────────────────────┐        ┌─────────────────────────────┐
-│ portfolio-v2               │  HTTP  │ kitty-agent (this repo)     │
-│ Next.js, static, Vercel    │  SSE   │ Python · FastAPI · LangGraph│
-│                            │ ─────▶ │ container host              │
-│ components/kitty-chat.tsx  │ ◀───── │ + Postgres (pgvector)       │
-└────────────────────────────┘ stream └─────────────────────────────┘
+```mermaid
+flowchart LR
+    subgraph pf["portfolio-v2 · Next.js on Vercel"]
+        widget["kitty-chat.tsx"]
+    end
+
+    subgraph ka["kitty-agent · container host"]
+        api["FastAPI"]
+        loop["LangGraph loop"]
+        store[("Postgres<br/>pgvector")]
+        api --> loop
+        loop --> store
+    end
+
+    widget -->|"POST /chat"| api
+    api -.->|"SSE: step, token, done"| widget
 ```
 
 The backend is a separate repo and a separate deploy because it is a
 long-running process and the portfolio is a static site. This mirrors
 `cloud-visitor-counter`, which is also consumed client side.
+
+## The loop
+
+A ReAct loop, built by hand rather than with the prebuilt helper. The agent
+node decides whether to answer or call a tool. If it called one, the results
+are appended to the message list and it runs again with them in hand.
+
+```mermaid
+flowchart TD
+    start([START]) --> agent["agent<br/>LLM bound to the tools"]
+    agent -->|"no tool calls"| finish([END])
+    agent -->|"tool calls present"| tools["tools<br/>ToolNode"]
+    tools -->|"results appended"| agent
+```
+
+Retrieval is one of those tools. It is not the shape of the program.
 
 ## Run it
 
