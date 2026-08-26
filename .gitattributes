@@ -1,0 +1,7 @@
+# Every text file here is stored with LF. Without this, a Windows checkout with
+# core.autocrlf=true writes them out as CRLF, and tooling that assumes LF then
+# reports files as wrong whose committed content is already correct.
+* text=auto eol=lf
+
+*.png binary
+*.ico binary

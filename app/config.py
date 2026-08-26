@@ -1,8 +1,4 @@
-"""Typed settings, read once from the environment.
-
-Same job as zod-parsed env in the Next side: fail loudly at boot rather than
-handing `undefined` to something three layers down.
-"""
+"""Typed settings, read once from the environment."""
 
 from functools import lru_cache
 
@@ -16,21 +12,15 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # Service
     app_name: str = "kitty-agent"
     environment: str = "development"
 
-    # Where the widget calls from. Comma separated so a host env var can carry
-    # several origins without any parsing ceremony at the call site.
     allowed_origins: str = "http://localhost:3000"
 
-    # Set once the agent exists. While it is empty every /chat request gets the
-    # napping fallback instead of a 500, which is the guardrail from the plan:
-    # a broken agent should never be the thing a recruiter sees.
+    # An empty key is a supported state, not a misconfiguration. It puts /chat
+    # into the napping fallback instead of failing, so do not assert on it.
     llm_api_key: str = ""
 
-    # Cost ceiling. Enforced for real in a later phase, declared here so the
-    # limit lives in config from the start rather than being bolted on.
     max_tokens_per_request: int = 2048
     rate_limit_per_minute: int = 10
 
@@ -45,5 +35,5 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
-    """Cached so the env is parsed once per process, not once per request."""
+    """Cached so the environment is parsed once per process, not once per request."""
     return Settings()

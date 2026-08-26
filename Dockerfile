@@ -1,6 +1,5 @@
-# Pinned to 3.12 rather than 3.13: the LangGraph and LangChain wheels landing in
-# later phases are the reason, and a predictable deploy is worth more than being
-# current here.
+# 3.12 rather than 3.13. The LangGraph and LangChain wheels this will need are
+# not reliably built for 3.13 yet, and a deploy is a bad place to find out.
 FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -9,13 +8,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# Dependency manifest first, so the install layer is cached until the deps
-# themselves change rather than on every source edit.
 COPY pyproject.toml README.md ./
 COPY app ./app
 RUN pip install --no-cache-dir .
 
-# Container hosts inject PORT and expect the process to bind it. Shell form so
-# the variable is expanded at runtime, with 8000 as the local default.
 EXPOSE 8000
+# Shell form on purpose. The exec form does not expand ${PORT}, and the host
+# injects it, so the container would bind the wrong port and fail its check.
 CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}

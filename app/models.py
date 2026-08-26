@@ -1,9 +1,4 @@
-"""Request and response shapes.
-
-The SSE event schema is declared now because the widget will be written against
-it long before the graph can emit real steps, and a stub that speaks the final
-protocol is worth more than one that has to be rewritten.
-"""
+"""Request and response shapes for the chat endpoint."""
 
 from typing import Literal
 
@@ -12,8 +7,6 @@ from pydantic import BaseModel, Field
 
 class ChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=2000)
-    # Groups the turns of one conversation. Becomes the LangGraph checkpointer
-    # key in phase 5; carried from the start so the client contract stops moving.
     thread_id: str | None = None
 
 

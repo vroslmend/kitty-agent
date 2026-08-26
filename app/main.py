@@ -1,10 +1,4 @@
-"""FastAPI entrypoint.
-
-Phase 0: health, CORS, and a /chat endpoint that already speaks SSE but has no
-agent behind it yet. Streaming the placeholder rather than returning plain JSON
-means the transport is proven before the graph lands, so phase 4 only has to
-swap what produces the events.
-"""
+"""FastAPI entrypoint."""
 
 import asyncio
 import uuid
@@ -38,17 +32,13 @@ NAPPING = "kitty's napping right now. try again in a bit."
 
 
 def sse(event: BaseModel) -> str:
-    """Serialise one pydantic event as an SSE frame.
-
-    Two trailing newlines, or the client buffers the frame forever waiting for
-    the record separator.
-    """
+    # Two trailing newlines, or the client holds the frame waiting for a
+    # record separator that never arrives.
     return f"data: {event.model_dump_json()}\n\n"
 
 
 @app.get("/health", response_model=HealthResponse)
 async def health() -> HealthResponse:
-    """Liveness probe. Container hosts poll this to decide if a deploy came up."""
     return HealthResponse(
         service=settings.app_name,
         environment=settings.environment,
@@ -65,11 +55,7 @@ async def napping_stream(thread_id: str) -> AsyncIterator[str]:
 
 @app.post("/chat")
 async def chat(request: ChatRequest) -> StreamingResponse:
-    """Streams the agent's steps and answer.
-
-    No graph yet, so every request gets the napping fallback. The shape of the
-    response is final.
-    """
+    """Streams the agent's steps and its answer as server sent events."""
     thread_id = request.thread_id or str(uuid.uuid4())
 
     return StreamingResponse(
@@ -77,6 +63,8 @@ async def chat(request: ChatRequest) -> StreamingResponse:
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
-            "X-Accel-Buffering": "no",  # stops nginx-style proxies buffering the stream
+            # Without this a buffering proxy holds the whole stream and
+            # delivers it at once, which looks like the agent hanging.
+            "X-Accel-Buffering": "no",
         },
     )

@@ -1,5 +1,7 @@
 # kitty
 
+[![CI](https://github.com/vroslmend/kitty-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/vroslmend/kitty-agent/actions/workflows/ci.yml)
+
 The on-site agent for [ammarhassan.dev](https://ammarhassan.dev). A LangGraph
 tool-calling agent behind a FastAPI server, streaming its steps to a chat widget
 in the portfolio.
@@ -95,13 +97,13 @@ now-playing widget use.
 
 ## Phases
 
-- [x] **0 — Scaffold.** FastAPI, config, SSE shape, Dockerfile, deploy.
-- [ ] **1 — Bare LangGraph loop.** StateGraph, agent node, one dummy tool, conditional edge.
-- [ ] **2 — Real tools.** `get_now_playing`, `list_projects`, `suggest_navigation`.
-- [ ] **3 — RAG as a tool.** `search_writing` over the essays and project copy.
-- [ ] **4 — Streaming and the UI.** `astream_events` into the widget.
-- [ ] **5 — Memory and clarify.** Checkpointer, `thread_id`, one interrupt path.
-- [ ] **6 — Evals and tracing.** Golden set, tool-choice accuracy, LLM as judge.
-- [ ] **7 — Polish and ship.**
+- [x] **0. Scaffold.** FastAPI, config, SSE shape, Dockerfile, deploy.
+- [ ] **1. Bare LangGraph loop.** StateGraph, agent node, one dummy tool, conditional edge.
+- [ ] **2. Real tools.** `get_now_playing`, `list_projects`, `suggest_navigation`.
+- [ ] **3. RAG as a tool.** `search_writing` over the essays and project copy.
+- [ ] **4. Streaming and the UI.** `astream_events` into the widget.
+- [ ] **5. Memory and clarify.** Checkpointer, `thread_id`, one interrupt path.
+- [ ] **6. Evals and tracing.** Golden set, tool-choice accuracy, LLM as judge.
+- [ ] **7. Polish and ship.**
 
 Evals are not optional. They are the difference between this and a wrapper.
