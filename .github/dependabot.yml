@@ -1,0 +1,28 @@
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types:
+          - minor
+          - patch
+    # Majors are excluded deliberately. There is a test suite, but it is smoke
+    # tests against a scaffold, and a green run is not evidence that a LangGraph
+    # or LangChain major kept its graph API. Do those migrations on purpose.
+    #
+    # Not a guarantee: security updates ignore these rules, so a major can still
+    # arrive as one. The requires-python cap in pyproject.toml is the other
+    # guard, since LangGraph does not support 3.14 yet.
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - version-update:semver-major
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
