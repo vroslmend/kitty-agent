@@ -11,6 +11,15 @@ dependencies = [
     "uvicorn[standard]>=0.32",
     "pydantic>=2.9",
     "pydantic-settings>=2.6",
+    # Only these three, never the `langchain` umbrella package. The umbrella
+    # drags in a tree big enough to matter against a serverless bundle limit,
+    # and nothing here imports from it.
+    "langgraph>=1.2",
+    "langchain-core>=1.0",
+    "langchain-google-genai>=4.3",
+    # zoneinfo has no tz database of its own on Windows, and python:3.12-slim
+    # does not ship one either, so ZoneInfo("Asia/Karachi") raises without this.
+    "tzdata>=2024.1",
 ]
 
 [project.optional-dependencies]
