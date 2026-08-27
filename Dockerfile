@@ -1,5 +1,4 @@
-# 3.12 rather than 3.13. The LangGraph and LangChain wheels this will need are
-# not reliably built for 3.13 yet, and a deploy is a bad place to find out.
+# Pinned to match the runtime the plan locks in, and the version CI installs.
 FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \

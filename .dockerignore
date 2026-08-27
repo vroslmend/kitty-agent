@@ -1,0 +1,23 @@
+# The build only needs pyproject.toml, README.md and app/. Everything else in
+# the context is uploaded to the builder for nothing, and .venv is large enough
+# to dominate the build time on its own.
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
+
+.git/
+.github/
+tests/
+.env
+.env.example
+.gitattributes
+.gitignore
+
+*.md
+!README.md
