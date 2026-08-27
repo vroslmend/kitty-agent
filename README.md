@@ -9,9 +9,9 @@ in the portfolio.
 It is an agent rather than a retrieval chatbot on purpose. Retrieval is one of
 its tools, and the graph decides when to reach for it.
 
-**In progress.** The loop runs and picks its tools correctly, driven from the
-command line. It is not yet wired to `/chat`, which still returns the napping
-fallback. Memory and retrieval need the database.
+**In progress.** The agent answers over `/chat`, streams its steps, remembers
+across turns, and has all five tools. Still to come: a clarifying question when
+a request is ambiguous, the harness that scores the golden set, and the widget.
 
 ## Architecture
 
@@ -79,7 +79,7 @@ link, not a list of his recent commits.
 | `suggest_navigation` | Where something lives on the site, as a path to link to. |
 | `get_now_playing` | What he is listening to, or last listened to. |
 | `get_github_activity` | What he has pushed recently. |
-| `search_writing` | His essays. Needs the database. Not built yet. |
+| `search_writing` | His essays, over pgvector. |
 
 The two that reach the network return a sentence on failure rather than
 raising. The model can relay that GitHub is rate limiting to a visitor; it can
@@ -115,8 +115,16 @@ The harness that scores it is not built yet. See `evals/README.md`.
 python -m venv .venv
 ./.venv/Scripts/python.exe -m pip install -e ".[dev]"   # Windows
 cp .env.example .env
-./.venv/Scripts/python.exe -m uvicorn app.main:app --reload
+./.venv/Scripts/python.exe -m app.db setup              # once, creates the tables
+./.venv/Scripts/python.exe -m app.rag.ingest            # once, builds the index
+./.venv/Scripts/python.exe -m app.serve
 ```
+
+Use `app.serve` rather than calling uvicorn directly. Uvicorn creates its event
+loop before importing the application, and psycopg's async mode will not run on
+Windows' default loop, so the policy has to be set before uvicorn starts. The
+symptom otherwise is every question answering "something went wrong on my end".
+Linux is unaffected, and Vercel imports the app itself.
 
 Then:
 

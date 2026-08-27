@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
+from app.agent.stream import run as agent_run
 from app.config import get_settings
 from app.models import ChatRequest, DoneEvent, HealthResponse, StepEvent, TokenEvent
 from app.ratelimit import RateLimiter, client_key
@@ -55,6 +56,12 @@ async def napping_stream(thread_id: str) -> AsyncIterator[str]:
     yield sse(DoneEvent(thread_id=thread_id))
 
 
+async def agent_stream(message: str, thread_id: str) -> AsyncIterator[str]:
+    async for event in agent_run(message, thread_id, settings):
+        yield sse(event)
+    yield sse(DoneEvent(thread_id=thread_id))
+
+
 # response_model=None because the return type is a union of two Response
 # classes, which FastAPI would otherwise try to turn into a Pydantic model.
 @app.post("/chat", response_model=None)
@@ -75,9 +82,15 @@ async def chat(body: ChatRequest, request: Request) -> StreamingResponse | JSONR
         )
 
     thread_id = body.thread_id or str(uuid.uuid4())
+    # An empty key is a supported state, not a misconfiguration, so this falls
+    # back rather than failing. It is what keeps a half configured deploy from
+    # being what a visitor meets.
+    stream = (
+        agent_stream(body.message, thread_id) if settings.agent_ready else napping_stream(thread_id)
+    )
 
     return StreamingResponse(
-        napping_stream(thread_id),
+        stream,
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
