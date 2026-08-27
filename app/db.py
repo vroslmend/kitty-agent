@@ -17,6 +17,7 @@ from psycopg.rows import dict_row
 from psycopg_pool import AsyncConnectionPool
 
 from app.config import get_settings
+from app.ratelimit import SCHEMA as RATE_LIMIT_SCHEMA
 
 # All three of these are required, and each fails in its own confusing way.
 #
@@ -79,9 +80,16 @@ async def get_checkpointer() -> AsyncPostgresSaver:
 
 
 async def setup() -> None:
-    """Create the checkpoint tables. Idempotent, but run it deliberately."""
+    """Create the checkpoint and rate limit tables. Idempotent, but run it
+    deliberately. The vector table is not here: it belongs to the ingest, which
+    has to run whenever the essays change anyway."""
     checkpointer = await get_checkpointer()
     await checkpointer.setup()
+
+    pool = await get_pool()
+    async with pool.connection() as conn:
+        for statement in RATE_LIMIT_SCHEMA:
+            await conn.execute(statement)
 
 
 async def _main() -> int:

@@ -11,11 +11,17 @@ from pydantic import BaseModel
 
 from app.agent.stream import run as agent_run
 from app.config import get_settings
+from app.db import get_pool
 from app.models import ChatRequest, DoneEvent, HealthResponse, StepEvent, TokenEvent
-from app.ratelimit import RateLimiter, client_key
+from app.ratelimit import ChatRateLimiter, client_key
 
 settings = get_settings()
-limiter = RateLimiter(settings.rate_limit_per_minute)
+# Without a database the shared window has nowhere to live, which leaves the
+# local one on its own. That is the pre-Neon behaviour, not a relaxation.
+limiter = ChatRateLimiter(
+    settings.rate_limit_per_minute,
+    pool_provider=get_pool if settings.database_url else None,
+)
 
 app = FastAPI(
     title="kitty",
@@ -74,7 +80,7 @@ async def chat(body: ChatRequest, request: Request) -> StreamingResponse | JSONR
     /health is deliberately not limited, or the platform's own probes would
     consume the allowance.
     """
-    if not limiter.allow(client_key(request)):
+    if not await limiter.allow(client_key(request)):
         return JSONResponse(
             status_code=429,
             content={"type": "error", "message": "too many requests. slow down."},

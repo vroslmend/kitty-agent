@@ -126,6 +126,11 @@ Windows' default loop, so the policy has to be set before uvicorn starts. The
 symptom otherwise is every question answering "something went wrong on my end".
 Linux is unaffected, and Vercel imports the app itself.
 
+`app.serve` also refuses to start when the port is busy. Windows honours
+`SO_REUSEADDR` far enough to let a second server bind a port a live one is
+already listening on, and then connections go to whichever the kernel picks. Set
+`PORT` to run more than one.
+
 Then:
 
 ```bash
@@ -184,6 +189,14 @@ that costs in answer quality.
 Over the rate limit, `/chat` returns `429` with a JSON body rather than a
 stream, and a `Retry-After` header. `/health` is not rate limited, or the
 platform's own probes would consume the allowance.
+
+The limit is counted twice: once in process, and once in Postgres. In process
+alone is wrong on serverless, where the real allowance would be the limit
+multiplied by however many instances happen to be warm. The shared count is a
+single statement holding a per-client advisory lock, so instances racing on the
+same client cannot each read the same under-limit count and both admit a
+request. If the database is unreachable the in-process window still applies:
+degraded to per instance, never absent.
 
 This shape is the contract. What produces the events will change; the events
 will not, so the widget can be written against them now.
