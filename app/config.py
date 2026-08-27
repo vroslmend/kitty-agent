@@ -21,11 +21,14 @@ class Settings(BaseSettings):
     # into the napping fallback instead of failing, so do not assert on it.
     llm_api_key: str = ""
 
-    # Free-tier quota is per model per day, and it is small on the newest ones:
-    # gemini-3.7-flash allows 20 requests a day, which one eval run exhausts.
-    # Check the real numbers at https://aistudio.google.com/rate-limit before
-    # changing this. The eval harness decides which model is actually best.
-    llm_model: str = "gemini-3.5-flash"
+    # Lite is not a cost preference, it is the only tier that works. Every full
+    # Flash model is capped at 20 requests a day on the free tier, which one
+    # eval run exhausts and which no public endpoint could serve. The Lite
+    # models get 500 a day and 15 a minute. Quotas are per model per day, so
+    # switching model gets a fresh bucket. Lite routes tools correctly but
+    # answers a little thinner, and measuring how much thinner is the harness's
+    # job. Real numbers: https://aistudio.google.com/rate-limit
+    llm_model: str = "gemini-3.5-flash-lite"
 
     # Neon. Carries the checkpointer, the interrupt resume state and pgvector.
     database_url: str = ""
