@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 from app.main import app, limiter
 from app.ratelimit import (
     SWEEP,
+    SWEEP_EVERY,
     TAKE,
     ChatRateLimiter,
     RateLimiter,
@@ -144,11 +145,24 @@ async def test_shared_falls_back_to_allowing_when_the_database_is_down():
 
 
 async def test_the_sweep_runs_once_and_then_holds_off():
+    # A cold instance must sweep on its first call. Timing this against zero
+    # instead of against "not yet" reads as correct and skips that sweep on any
+    # host whose monotonic clock started less than the interval ago, which is
+    # every fresh CI runner.
     conn = FakeConnection({"allowed": True})
     shared = SharedRateLimiter(10, pool_of(conn))
     for _ in range(3):
         await shared.allow("k")
     assert sum(s == SWEEP for s in conn.statements) == 1
+
+
+async def test_the_sweep_comes_back_round_after_the_interval():
+    conn = FakeConnection({"allowed": True})
+    shared = SharedRateLimiter(10, pool_of(conn))
+    await shared.allow("k")
+    shared._swept_at -= SWEEP_EVERY + 1
+    await shared.allow("k")
+    assert sum(s == SWEEP for s in conn.statements) == 2
 
 
 async def test_a_local_refusal_never_reaches_the_database():

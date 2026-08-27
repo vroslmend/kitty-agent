@@ -103,7 +103,7 @@ class SharedRateLimiter:
     def __init__(self, per_minute: int, pool_provider: PoolProvider) -> None:
         self.per_minute = per_minute
         self._pool_provider = pool_provider
-        self._swept_at = 0.0
+        self._swept_at: float | None = None
 
     async def allow(self, key: str) -> bool:
         try:
@@ -124,7 +124,10 @@ class SharedRateLimiter:
 
     async def _sweep(self, conn) -> None:
         now = time.monotonic()
-        if now - self._swept_at < SWEEP_EVERY:
+        # None, not 0.0. monotonic() counts from an arbitrary origin, usually
+        # boot, so on a host that started a moment ago 0.0 is seconds back and
+        # the first sweep of a cold instance never runs.
+        if self._swept_at is not None and now - self._swept_at < SWEEP_EVERY:
             return
         self._swept_at = now
         await conn.execute(SWEEP)
