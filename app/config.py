@@ -40,7 +40,9 @@ class Settings(BaseSettings):
 
     # The Spotify credentials live in portfolio-v2, which already proxies them.
     # Pointing at that endpoint keeps one copy of the refresh token, not two.
-    now_playing_url: str = ""
+    # It is a public read endpoint, not a secret, so it defaults to the real one
+    # rather than to empty: an unset variable should not silently disable a tool.
+    now_playing_url: str = "https://ammarhassan.dev/api/now-playing"
 
     site_base_url: str = "https://ammarhassan.dev"
 

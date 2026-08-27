@@ -1,16 +1,17 @@
-"""Pin the environment the suite runs against.
+"""Cut the suite off from the developer's `.env` entirely.
 
-`Settings` reads `.env`, and `app.main` resolves settings at import time, so
-without this the result depends on whatever the developer happens to have
-configured locally: green in CI, which has no `.env`, and red the moment someone
-pastes a real key in. Environment variables outrank the dotenv file, so setting
-them here decides it before any test module imports the app.
+`Settings` reads `.env`, and `app.main` resolves settings at import, so any
+value configured locally silently leaks into the tests. That is green here and
+red in CI, which has no `.env`, and it has already happened twice: once on
+`LLM_API_KEY` and once on `NOW_PLAYING_URL`.
 
-Nothing in the suite calls the model. An empty key is the documented baseline:
-`/chat` answers with the napping fallback rather than failing.
+Pinning variables one at a time only fixes the ones someone thought of. Turning
+the dotenv file off makes the suite run on the same defaults CI sees, so a
+setting added later cannot reintroduce the problem.
+
+This runs at import, before any test module imports the app.
 """
 
-import os
+from app.config import Settings
 
-os.environ["LLM_API_KEY"] = ""
-os.environ["RATE_LIMIT_PER_MINUTE"] = "10"
+Settings.model_config["env_file"] = None
