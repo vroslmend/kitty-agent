@@ -50,6 +50,12 @@ If you changed the event schema in `app/models.py`, say so prominently in the pu
 
 - **The `CMD` in the Dockerfile is shell form on purpose.** The exec form does not expand `${PORT}`, and container hosts inject it. Switching to the exec form makes the container bind the wrong port and fail its health check, on the host only, where you cannot see it.
 - **SSE frames need two trailing newlines.** One looks correct and streams nothing: the client holds the frame waiting for a record separator. `sse()` in `app/main.py` is the only place that should be building them.
+- **The rate limit on `/chat` is load bearing, not decoration.** It is in-process
+  and per-instance, so it is also wrong the moment this runs as more than one
+  container: each would enforce its own allowance. Move it to a shared store
+  before scaling out rather than deleting it.
+- **Client identity comes from `X-Forwarded-For`, not `request.client`.** Behind
+  a proxy the latter is the proxy, which would put every visitor in one bucket.
 - **An empty `LLM_API_KEY` is a supported state.** Do not add a check that refuses to boot without one. The napping fallback exists so that a missing key, or a broken agent, degrades quietly rather than showing a stack trace to whoever opened the chat.
 - **`.gitattributes` normalises everything to LF.** If you see a diff where every line changed, your checkout wrote CRLF. Re-clone or run `git add --renormalize .` rather than committing it.
 

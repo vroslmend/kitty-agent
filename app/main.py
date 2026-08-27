@@ -4,15 +4,17 @@ import asyncio
 import uuid
 from collections.abc import AsyncIterator
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
 from app.config import get_settings
 from app.models import ChatRequest, DoneEvent, HealthResponse, StepEvent, TokenEvent
+from app.ratelimit import RateLimiter, client_key
 
 settings = get_settings()
+limiter = RateLimiter(settings.rate_limit_per_minute)
 
 app = FastAPI(
     title="kitty",
@@ -53,10 +55,26 @@ async def napping_stream(thread_id: str) -> AsyncIterator[str]:
     yield sse(DoneEvent(thread_id=thread_id))
 
 
-@app.post("/chat")
-async def chat(request: ChatRequest) -> StreamingResponse:
-    """Streams the agent's steps and its answer as server sent events."""
-    thread_id = request.thread_id or str(uuid.uuid4())
+# response_model=None because the return type is a union of two Response
+# classes, which FastAPI would otherwise try to turn into a Pydantic model.
+@app.post("/chat", response_model=None)
+async def chat(body: ChatRequest, request: Request) -> StreamingResponse | JSONResponse:
+    """Streams the agent's steps and its answer as server sent events.
+
+    Rate limited before anything else runs. Once a model sits behind this, a
+    request costs real money and the endpoint is public and unauthenticated,
+    so the limit is the only thing between an abusive client and the bill.
+    /health is deliberately not limited, or the platform's own probes would
+    consume the allowance.
+    """
+    if not limiter.allow(client_key(request)):
+        return JSONResponse(
+            status_code=429,
+            content={"type": "error", "message": "too many requests. slow down."},
+            headers={"Retry-After": "60"},
+        )
+
+    thread_id = body.thread_id or str(uuid.uuid4())
 
     return StreamingResponse(
         napping_stream(thread_id),

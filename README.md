@@ -88,7 +88,7 @@ Everything is read once at boot through `pydantic-settings`. See `.env.example`.
 | `ALLOWED_ORIGINS` | Comma separated CORS origins. |
 | `LLM_API_KEY` | Empty until the agent exists. Empty means `/chat` returns the napping fallback rather than an error. |
 | `MAX_TOKENS_PER_REQUEST` | Cost ceiling. Declared now, enforced in a later phase. |
-| `RATE_LIMIT_PER_MINUTE` | Abuse ceiling. Same. |
+| `RATE_LIMIT_PER_MINUTE` | Requests per client per minute on `/chat`. Enforced. Over it returns 429. |
 
 ## The `/chat` protocol
 
@@ -101,6 +101,10 @@ Everything is read once at boot through `pydantic-settings`. See `.env.example`.
 | `token` | `text` | A piece of the answer. |
 | `done` | `thread_id` | Finished. Send this `thread_id` back to continue the conversation. |
 | `error` | `message` | Something failed. |
+
+Over the rate limit, `/chat` returns `429` with a JSON body rather than a
+stream, and a `Retry-After` header. `/health` is not rate limited, or the
+platform's own probes would consume the allowance.
 
 This shape is final. Phase 4 changes what produces the events, not the events
 themselves, so the widget can be written against it now.
