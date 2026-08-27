@@ -26,7 +26,7 @@ In scope:
 
 Out of scope: the agent being wrong, confused or unhelpful, which is a quality problem and belongs in a normal issue. Also out of scope: ordinary traffic volume against free tier hosting.
 
-Note that as of phase 0 there is no model and no tools behind `/chat`, so most of the above describes the surface this will have rather than the surface it has today. Reports against the current code are still welcome.
+Note that there is no model and no tools behind `/chat` yet, so most of the above describes the surface this will have rather than the surface it has today. Reports against the current code are still welcome.
 
 ## What to expect
 

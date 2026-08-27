@@ -6,12 +6,12 @@ The on-site agent for [ammarhassan.dev](https://ammarhassan.dev). A LangGraph
 tool-calling agent behind a FastAPI server, streaming its steps to a chat widget
 in the portfolio.
 
-It is an agent rather than a retrieval chatbot on purpose. Retrieval is one tool
-among several, not the architecture.
+It is an agent rather than a retrieval chatbot on purpose. Retrieval is one of
+its tools, and the graph decides when to reach for it.
 
-**Status: phase 0.** The service boots, speaks SSE, and reports its own health.
-There is no graph behind `/chat` yet, so every request returns the napping
-fallback.
+**Early.** The service boots, speaks SSE, rate limits itself and reports its
+own health. There is no graph behind `/chat` yet, so every request returns the
+napping fallback.
 
 ## Architecture
 
@@ -87,7 +87,7 @@ Everything is read once at boot through `pydantic-settings`. See `.env.example`.
 | `ENVIRONMENT` | Reported by `/health`. |
 | `ALLOWED_ORIGINS` | Comma separated CORS origins. |
 | `LLM_API_KEY` | Empty until the agent exists. Empty means `/chat` returns the napping fallback rather than an error. |
-| `MAX_TOKENS_PER_REQUEST` | Cost ceiling. Declared now, enforced in a later phase. |
+| `MAX_TOKENS_PER_REQUEST` | Cost ceiling. Declared, not yet enforced. |
 | `RATE_LIMIT_PER_MINUTE` | Requests per client per minute on `/chat`. Enforced. Over it returns 429. |
 
 ## The `/chat` protocol
@@ -106,8 +106,8 @@ Over the rate limit, `/chat` returns `429` with a JSON body rather than a
 stream, and a `Retry-After` header. `/health` is not rate limited, or the
 platform's own probes would consume the allowance.
 
-This shape is final. Phase 4 changes what produces the events, not the events
-themselves, so the widget can be written against it now.
+This shape is the contract. What produces the events will change; the events
+will not, so the widget can be written against them now.
 
 ## Deploy
 
@@ -123,16 +123,3 @@ from a connected repo with no extra configuration.
 Then set `NEXT_PUBLIC_KITTY_API_URL` in the portfolio to the deployed URL. Unset
 means the widget stays hidden, the same convention the visitor counter and
 now-playing widget use.
-
-## Phases
-
-- [x] **0. Scaffold.** FastAPI, config, SSE shape, Dockerfile, deploy.
-- [ ] **1. Bare LangGraph loop.** StateGraph, agent node, one dummy tool, conditional edge.
-- [ ] **2. Real tools.** `get_now_playing`, `list_projects`, `suggest_navigation`.
-- [ ] **3. RAG as a tool.** `search_writing` over the essays and project copy.
-- [ ] **4. Streaming and the UI.** `astream_events` into the widget.
-- [ ] **5. Memory and clarify.** Checkpointer, `thread_id`, one interrupt path.
-- [ ] **6. Evals and tracing.** Golden set, tool-choice accuracy, LLM as judge.
-- [ ] **7. Polish and ship.**
-
-Evals are not optional. They are the difference between this and a wrapper.

@@ -10,7 +10,7 @@ Be decent to people in issues and pull requests. That is the whole code of condu
 
 An agent, not a retrieval chatbot. A LangGraph loop decides which tools to call and in what order, and retrieval is one of those tools rather than the architecture. If you are proposing a change that turns it back into a single retrieval hop, that is the thing to argue for explicitly, because it is the decision the project is built around.
 
-[README.md](README.md) has the architecture and the phase list. The service is early: phase 0 is a scaffold with no model behind it.
+[README.md](README.md) has the architecture. The service is early: a scaffold with no model behind it yet.
 
 ## Setting up
 

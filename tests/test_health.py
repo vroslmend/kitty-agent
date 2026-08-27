@@ -1,4 +1,4 @@
-"""Phase 0 smoke tests: the service boots, CORS is wired, SSE frames parse."""
+"""Smoke tests: the service boots, CORS is wired, SSE frames parse."""
 
 import json
 
