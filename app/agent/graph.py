@@ -28,9 +28,14 @@ def should_continue(state: AgentState) -> str:
     return "tools" if getattr(last, "tool_calls", None) else END
 
 
-def build_graph(settings: Settings):
+def build_graph(settings: Settings, checkpointer=None):
     """Compile the graph. Raises if the API key is empty, so callers must check
-    `settings.agent_ready` first and fall back to napping if it is False."""
+    `settings.agent_ready` first and fall back to napping if it is False.
+
+    Without a checkpointer the graph still answers, it just forgets between
+    turns. That is the right shape for tests, which should not need a database
+    to prove the loop routes correctly.
+    """
     llm = ChatGoogleGenerativeAI(
         model=settings.llm_model,
         google_api_key=settings.llm_api_key,
@@ -49,4 +54,4 @@ def build_graph(settings: Settings):
     builder.add_edge(START, "agent")
     builder.add_conditional_edges("agent", should_continue, {"tools": "tools", END: END})
     builder.add_edge("tools", "agent")
-    return builder.compile()
+    return builder.compile(checkpointer=checkpointer)

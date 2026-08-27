@@ -16,8 +16,10 @@ dependencies = [
     # and nothing here imports from it.
     "httpx>=0.27",
     "langgraph>=1.2",
+    "langgraph-checkpoint-postgres>=3.1",
     "langchain-core>=1.0",
     "langchain-google-genai>=4.3",
+    "psycopg[binary,pool]>=3.2",
     # zoneinfo has no tz database of its own on Windows, and python:3.12-slim
     # does not ship one either, so ZoneInfo("Asia/Karachi") raises without this.
     "tzdata>=2024.1",
