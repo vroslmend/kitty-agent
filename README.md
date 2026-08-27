@@ -9,9 +9,9 @@ in the portfolio.
 It is an agent rather than a retrieval chatbot on purpose. Retrieval is one of
 its tools, and the graph decides when to reach for it.
 
-**Early.** The service boots, speaks SSE, rate limits itself and reports its
-own health. There is no graph behind `/chat` yet, so every request returns the
-napping fallback.
+**In progress.** The loop runs and picks its tools correctly, driven from the
+command line. It is not yet wired to `/chat`, which still returns the napping
+fallback. Memory and retrieval need the database.
 
 ## Architecture
 
@@ -21,10 +21,10 @@ flowchart LR
         widget["kitty-chat.tsx"]
     end
 
-    subgraph ka["kitty-agent · container host"]
+    subgraph ka["kitty-agent · Python on Vercel"]
         api["FastAPI"]
         loop["LangGraph loop"]
-        store[("Postgres<br/>pgvector")]
+        store[("Neon Postgres<br/>checkpoints · pgvector")]
         api --> loop
         loop --> store
     end
@@ -33,9 +33,13 @@ flowchart LR
     api -.->|"SSE: step, token, done"| widget
 ```
 
-The backend is a separate repo and a separate deploy because it is a
-long-running process and the portfolio is a static site. This mirrors
+Two repos and two deploys. The portfolio is a static Next.js site and this is a
+Python service, so they have nothing to share but an HTTP contract. It mirrors
 `cloud-visitor-counter`, which is also consumed client side.
+
+Both halves run on Vercel, but as separate projects. This one is a single
+Python function, so it holds no state between requests and conversation memory
+lives in Postgres rather than in the process.
 
 ## The loop
 
@@ -52,6 +56,58 @@ flowchart TD
 ```
 
 Retrieval is one of those tools. It is not the shape of the program.
+
+Drive it directly, without the API in front:
+
+```bash
+./.venv/Scripts/python.exe -m app.agent "which of his projects use terraform?"
+```
+
+It prints each decision as it happens, so a wrong tool choice is visible rather
+than buried in the final answer.
+
+## Tools
+
+A tool's docstring is the contract the model reads to decide whether to call
+it, so each one also names the neighbouring tool to use instead. The near-miss
+pairs are what routing actually gets wrong: asking where his GitHub is wants a
+link, not a list of his recent commits.
+
+| Tool | Answers |
+|---|---|
+| `list_projects` | What he has built, filtered by stack, year or keyword. |
+| `suggest_navigation` | Where something lives on the site, as a path to link to. |
+| `get_now_playing` | What he is listening to, or last listened to. |
+| `get_github_activity` | What he has pushed recently. |
+| `search_writing` | His essays. Needs the database. Not built yet. |
+
+The two that reach the network return a sentence on failure rather than
+raising. The model can relay that GitHub is rate limiting to a visitor; it can
+do nothing useful with a traceback.
+
+`list_projects` and `suggest_navigation` read `app/data/site.json`, which is
+generated from the portfolio rather than written twice:
+
+```bash
+node scripts/sync_site_content.mjs
+```
+
+Re-run it when the portfolio's projects or writing change.
+
+## Evals
+
+`evals/dataset.jsonl` holds 46 golden questions written against the real site,
+each with the tools that should fire and the traits the answer needs. It was
+written before the tools existed so it would shape their design rather than
+ratify it.
+
+Nineteen of the 46 expect no tool call at all. An agent that reaches for a tool
+on every turn is a common failure, and half the routing skill is knowing when
+not to. The rest cover the near-miss pairs, prompt injection, questions it
+should refuse to guess at, and one case that only means anything with the
+network unplugged.
+
+The harness that scores it is not built yet. See `evals/README.md`.
 
 ## Run it
 
@@ -78,6 +134,10 @@ like a single blob.
 ./.venv/Scripts/python.exe -m pytest
 ```
 
+Nothing in the suite calls a model or the network. The tests deliberately do
+not read `.env`, so they run on the same defaults CI sees. To check a change
+the way CI will, move `.env` aside first.
+
 ## Configuration
 
 Everything is read once at boot through `pydantic-settings`. See `.env.example`.
@@ -86,9 +146,20 @@ Everything is read once at boot through `pydantic-settings`. See `.env.example`.
 |---|---|
 | `ENVIRONMENT` | Reported by `/health`. |
 | `ALLOWED_ORIGINS` | Comma separated CORS origins. |
-| `LLM_API_KEY` | Empty until the agent exists. Empty means `/chat` returns the napping fallback rather than an error. |
+| `LLM_API_KEY` | Empty means `/chat` returns the napping fallback rather than an error. |
+| `LLM_MODEL` | Default `gemini-3.5-flash-lite`. See below. |
+| `DATABASE_URL` | Neon, pooled. Checkpoints and pgvector. |
+| `NOW_PLAYING_URL` | The portfolio's Spotify proxy, so the refresh token lives in one place. |
+| `GITHUB_USERNAME` / `GITHUB_TOKEN` | The token is optional and needs no scopes. Without it GitHub allows 60 requests an hour shared across every visitor. |
+| `SITE_BASE_URL` | The portfolio's origin. |
 | `MAX_TOKENS_PER_REQUEST` | Cost ceiling. Declared, not yet enforced. |
 | `RATE_LIMIT_PER_MINUTE` | Requests per client per minute on `/chat`. Enforced. Over it returns 429. |
+
+The model default is a constraint, not a preference. Every full Gemini Flash
+model allows 20 requests a day on the free tier, which one pass over the golden
+set would exhaust and which no public endpoint could serve. The Lite models
+allow 500 a day. Quotas are per model, so the eval harness gets to decide what
+that costs in answer quality.
 
 ## The `/chat` protocol
 
@@ -111,14 +182,20 @@ will not, so the widget can be written against them now.
 
 ## Deploy
 
-Any container host that builds a Dockerfile. Railway and Render both do this
-from a connected repo with no extra configuration.
+Vercel, as its own project pointed at this repo. The FastAPI preset finds
+`app/main.py` on its own, so no build configuration is needed. `vercel.json`
+only caps the function duration and keeps tests and fixtures out of the bundle.
 
-1. Create the service and point it at this repo.
-2. Set the environment variables above. `ALLOWED_ORIGINS` must include the
-   portfolio's production origin.
-3. The host injects `PORT`; the container already binds it.
-4. Point the health check at `/health`.
+1. Import the repo at [vercel.com/new](https://vercel.com/new) with no
+   environment variables. An empty `LLM_API_KEY` means the service comes up in
+   the napping fallback and cannot call a model, so a first deploy proves the
+   hosting without exposing anything.
+2. Attach Neon from the project's Storage tab. It writes `DATABASE_URL` in.
+3. Add `LLM_API_KEY`, and set `ALLOWED_ORIGINS` to the portfolio's origin.
+
+The Dockerfile is kept for local runs and portability. It is not what Vercel
+builds, and the service is deliberately host agnostic: it binds `PORT` and
+holds no local state, so a container host is a fallback rather than a rewrite.
 
 Then set `NEXT_PUBLIC_KITTY_API_URL` in the portfolio to the deployed URL. Unset
 means the widget stays hidden, the same convention the visitor counter and
