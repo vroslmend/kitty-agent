@@ -21,9 +21,11 @@ class Settings(BaseSettings):
     # into the napping fallback instead of failing, so do not assert on it.
     llm_api_key: str = ""
 
-    # Free-tier availability differs per model and is only visible in AI Studio,
-    # so this stays configurable. The eval harness is what decides the default.
-    llm_model: str = "gemini-3.7-flash"
+    # Free-tier quota is per model per day, and it is small on the newest ones:
+    # gemini-3.7-flash allows 20 requests a day, which one eval run exhausts.
+    # Check the real numbers at https://aistudio.google.com/rate-limit before
+    # changing this. The eval harness decides which model is actually best.
+    llm_model: str = "gemini-3.5-flash"
 
     # Neon. Carries the checkpointer, the interrupt resume state and pgvector.
     database_url: str = ""

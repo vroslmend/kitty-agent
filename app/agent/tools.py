@@ -2,31 +2,186 @@
 
 A tool's docstring is not documentation, it is the contract the model reads to
 decide whether to call it. Vague docstrings are the usual cause of an agent
-picking the wrong tool, so each one says what it answers and when to reach for
-it.
+picking the wrong tool, so each one says what it answers, and says which
+neighbouring tool to use instead where two of them look similar.
+
+Tools that reach the network return a plain sentence on failure rather than
+raising. The model can relay "GitHub is not answering" to a visitor; it cannot
+do anything useful with a traceback.
 """
 
-from datetime import datetime
-from zoneinfo import ZoneInfo
-
+import httpx
 from langchain_core.tools import tool
 
-# Provisional. This is the scaffold tool for the bare loop, kept because it is
-# real, cheap and unguessable by the model, which is what makes it a usable
-# smoke test. Reconsider it when the five real tools land.
-SITE_TIMEZONE = ZoneInfo("Asia/Karachi")
+from app.config import get_settings
+from app.content import pages, projects, site
+
+# Short on purpose. These run inside a serverless invocation with a wall-clock
+# budget, and a slow upstream must not spend it all before the model can answer.
+TIMEOUT = httpx.Timeout(8.0, connect=4.0)
+
+GITHUB_API = "https://api.github.com"
+
+
+def _matches(project: dict, topic: str) -> bool:
+    haystack = " ".join(
+        [
+            project["name"],
+            project["slug"],
+            project["tagline"],
+            project["description"],
+            project["year"],
+            *project["stack"],
+        ]
+    ).lower()
+    return topic.lower().strip() in haystack
+
+
+def _render(project: dict) -> str:
+    stack = ", ".join(project["stack"])
+    links = " ".join(f"{k}: {v}" for k, v in project["links"].items())
+    lines = [
+        f"{project['name']} ({project['year']}) - {project['tagline']}",
+        f"  {project['description']}",
+        f"  stack: {stack}",
+    ]
+    if links:
+        lines.append(f"  {links}")
+    return "\n".join(lines)
 
 
 @tool
-def get_site_time() -> str:
-    """Get the current local date and time where Ammar is, in Lahore, Pakistan.
+def list_projects(topic: str | None = None) -> str:
+    """Look up the projects Ammar has built, optionally filtered by a topic.
 
-    Use this when a visitor asks what time it is for him, whether he is likely
-    to be awake, or what day it is on his side. Do not use it for anything
-    about his projects, writing or music.
+    `topic` is matched against each project's name, tagline, description, tech
+    stack and year, so "python", "terraform", "2026" and "multiplayer" all
+    work. Leave it out to get the ones he features.
+
+    Use this for anything about what he has built or what a named project is.
+    Do not use it for what he is working on right now, which is
+    get_github_activity, or for his essays, which is search_writing.
     """
-    now = datetime.now(SITE_TIMEZONE)
-    return now.strftime("%A %d %B %Y, %H:%M") + " in Lahore (UTC+5)"
+    all_projects = projects()
+    if topic:
+        found = [p for p in all_projects if _matches(p, topic)]
+        if not found:
+            names = ", ".join(p["name"] for p in all_projects)
+            return f"No project matches {topic!r}. The projects are: {names}."
+        header = f"{len(found)} project(s) matching {topic!r}:"
+    else:
+        found = [p for p in all_projects if p["featured"]]
+        header = f"His featured projects ({len(all_projects)} in total):"
+    return header + "\n\n" + "\n\n".join(_render(p) for p in found)
 
 
-TOOLS = [get_site_time]
+@tool
+def suggest_navigation(topic: str) -> str:
+    """Find where something lives on the site and return a path to link to.
+
+    Use this when a visitor asks where something is or asks to be taken
+    somewhere: the photos, the writing, a particular essay, the resume, his
+    GitHub or LinkedIn.
+
+    This points at a destination, it does not answer the question. If they
+    asked what he has written about, use search_writing instead; if they asked
+    to be taken to the writing, use this.
+    """
+    query = topic.lower().strip()
+    links = site()["links"]
+
+    destinations: list[tuple[str, str, list[str]]] = [
+        ("/", "the home page", ["home", "start", "index", "main", "landing"]),
+        ("/about", "about him", ["about", "bio", "who", "background", "himself"]),
+        ("/work", "his work and projects", ["work", "projects", "portfolio", "built"]),
+        ("/writing", "his writing", ["writing", "essays", "blog", "posts", "articles"]),
+        ("/photos", "his photos", ["photo", "photos", "photography", "pictures"]),
+        (links["resume"], "his resume", ["resume", "cv", "curriculum"]),
+        (links["github"], "his GitHub", ["github", "code", "repos", "repositories"]),
+        (links["linkedin"], "his LinkedIn", ["linkedin"]),
+    ]
+    for page in pages():
+        if page["route"].startswith("/writing/"):
+            slug = page["route"].rsplit("/", 1)[-1]
+            keywords = [slug, *slug.split("-"), *page["title"].lower().split()]
+            destinations.append((page["route"], f"the essay {page['title']!r}", keywords))
+
+    for path, label, keywords in destinations:
+        if any(k in query for k in keywords):
+            return f"{label}: {path}"
+
+    routes = ", ".join(path for path, _, _ in destinations)
+    return f"Nothing on the site matches {topic!r}. Available destinations: {routes}."
+
+
+@tool
+async def get_now_playing() -> str:
+    """Check what Ammar is listening to on Spotify.
+
+    Answers what is playing right now, and if nothing is, what he played most
+    recently. It has no further history than that one track, so it cannot say
+    what he was listening to at some past moment.
+
+    Use this only for music. His essay about building this feature is a
+    different thing, and that is search_writing.
+    """
+    url = get_settings().now_playing_url
+    if not url:
+        return "The now-playing feed is not configured, so I cannot check."
+    try:
+        async with httpx.AsyncClient(timeout=TIMEOUT) as client:
+            response = await client.get(url)
+            response.raise_for_status()
+            data = response.json()
+    except httpx.HTTPError:
+        return "The now-playing feed is not responding, so I cannot check right now."
+
+    title, artist = data.get("title"), data.get("artist")
+    if not title:
+        return "Nothing is playing, and there is no recent track to report."
+    # isPlaying false with a title means the feed fell back to the last track.
+    # Reporting that as live would be a small lie the visitor cannot check.
+    if data.get("isPlaying"):
+        return f"Playing right now: {title} by {artist}."
+    return f"Nothing is playing right now. The last track was {title} by {artist}."
+
+
+@tool
+async def get_github_activity(limit: int = 5) -> str:
+    """Check what Ammar has been pushing to GitHub recently.
+
+    Returns his most recently updated public repositories, newest first, with
+    when each was last pushed to. Use this for what he is working on now, or
+    lately, or whether he is still active.
+
+    Use list_projects instead for what he has built in general. This one sees
+    only recent pushes, not his whole history, and not private work.
+    """
+    settings = get_settings()
+    headers = {"Accept": "application/vnd.github+json"}
+    if settings.github_token:
+        headers["Authorization"] = f"Bearer {settings.github_token}"
+
+    url = f"{GITHUB_API}/users/{settings.github_username}/repos"
+    params = {"sort": "pushed", "direction": "desc", "per_page": max(1, min(limit, 10))}
+    try:
+        async with httpx.AsyncClient(timeout=TIMEOUT) as client:
+            response = await client.get(url, params=params, headers=headers)
+            if response.status_code in (403, 429):
+                return "GitHub is rate limiting me, so I cannot check his recent activity."
+            response.raise_for_status()
+            repos = response.json()
+    except httpx.HTTPError:
+        return "GitHub is not responding, so I cannot check his recent activity right now."
+
+    if not repos:
+        return "GitHub returned no public repositories."
+    lines = [
+        f"{r['name']} - pushed {r['pushed_at'][:10]}"
+        + (f" - {r['description']}" if r.get("description") else "")
+        for r in repos
+    ]
+    return "Most recently pushed public repositories:\n" + "\n".join(lines)
+
+
+TOOLS = [list_projects, suggest_navigation, get_now_playing, get_github_activity]
