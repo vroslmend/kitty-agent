@@ -15,6 +15,7 @@ from langchain_core.tools import tool
 
 from app.config import get_settings
 from app.content import pages, projects, site
+from app.rag.store import search
 
 # Short on purpose. These run inside a serverless invocation with a wall-clock
 # budget, and a slow upstream must not spend it all before the model can answer.
@@ -184,4 +185,37 @@ async def get_github_activity(limit: int = 5) -> str:
     return "Most recently pushed public repositories:\n" + "\n".join(lines)
 
 
-TOOLS = [list_projects, suggest_navigation, get_now_playing, get_github_activity]
+@tool
+async def search_writing(query: str) -> str:
+    """Search what Ammar has written in his essays.
+
+    Use this for his opinions, his reasoning, or how he thinks about something,
+    and to find whether he has written on a topic at all. Returns passages with
+    the route each came from, so the answer can point at the full piece.
+
+    Use list_projects instead for what he built rather than what he wrote about
+    it, and suggest_navigation if they only want a link to the writing rather
+    than an answer drawn from it.
+    """
+    if not get_settings().database_url:
+        return "The writing index is not configured, so I cannot search the essays."
+    try:
+        rows = await search(query, limit=4)
+    except Exception:
+        # Anything from the database or the embedding call. A visitor is better
+        # served by one honest sentence than by the agent failing mid-answer.
+        return "I could not search the writing just now."
+
+    if not rows:
+        return f"Nothing in his writing matches {query!r}."
+    passages = [f"From {r['title']!r} ({r['route']}):\n{r['content']}" for r in rows]
+    return "\n\n".join(passages)
+
+
+TOOLS = [
+    search_writing,
+    list_projects,
+    suggest_navigation,
+    get_now_playing,
+    get_github_activity,
+]

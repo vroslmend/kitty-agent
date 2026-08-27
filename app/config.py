@@ -33,6 +33,20 @@ class Settings(BaseSettings):
     # Neon. Carries the checkpointer, the interrupt resume state and pgvector.
     database_url: str = ""
 
+    # Not gemini-embedding-2, despite it being the newer and recommended one.
+    # This is text-only retrieval, where the useful lever is telling the model
+    # whether it is embedding a passage or a question. Only 001 has task_type.
+    # Embedding 2 replaced it with instructions in the prompt, and it still
+    # accepts a task_type argument without acting on it, so passing one there
+    # would look correct and do nothing. 001 is not deprecated.
+    #
+    # 3072 dimensions natively, above pgvector's 2000 ceiling for an HNSW or
+    # IVFFlat index. It is a Matryoshka model, so 768 truncates rather than
+    # degrades and leaves indexing possible later. Changing the number
+    # invalidates every stored vector: re-run the ingest, do not just edit it.
+    embedding_model: str = "gemini-embedding-001"
+    embedding_dimensions: int = 768
+
     github_username: str = "vroslmend"
     # Unauthenticated GitHub is 60 requests an hour, which one impatient visitor
     # can exhaust. A token raises it to 5000 and needs no scopes for public data.
