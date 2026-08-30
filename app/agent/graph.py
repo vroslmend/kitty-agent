@@ -10,10 +10,11 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.graph import END, START, StateGraph
 from langgraph.prebuilt import ToolNode
 
-from app.agent.prompts import SYSTEM_PROMPT
+from app.agent.prompts import build_system_prompt
 from app.agent.state import AgentState
 from app.agent.tools import TOOLS, ask_clarification
 from app.config import Settings
+from app.content import site
 
 # A call and its result are two steps, so this is roughly four rounds of tool
 # use before the graph stops itself. The endpoint is public and pays per step;
@@ -46,11 +47,12 @@ def build_graph(settings: Settings, checkpointer=None):
         google_api_key=settings.llm_api_key,
         max_output_tokens=settings.max_tokens_per_request,
     ).bind_tools(tools)
+    system_prompt = build_system_prompt(site())
 
     async def agent(state: AgentState) -> dict:
         # Prepended per call rather than stored in state. Kept in state it would
         # be written into every checkpoint and prepended again on resume.
-        messages = [SystemMessage(content=SYSTEM_PROMPT), *state["messages"]]
+        messages = [SystemMessage(content=system_prompt), *state["messages"]]
         return {"messages": [await llm.ainvoke(messages)]}
 
     builder = StateGraph(AgentState)

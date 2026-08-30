@@ -9,10 +9,10 @@ in the portfolio.
 It is an agent rather than a retrieval chatbot on purpose. Retrieval is one of
 its tools, and the graph decides when to reach for it.
 
-**In progress.** The agent answers over `/chat`, streams its steps, remembers
-across turns, has all five tools, and pauses to ask which one you meant when a
-question is vague. Still to come: the harness that scores the golden set, and
-the widget.
+**In progress.** The production API answers over `/chat`, streams its steps,
+remembers across turns, has all five information tools, and pauses to clarify
+vague questions. The evaluation runner is in place. Still to come: the portfolio
+widget, the MCP surface, and final polish.
 
 ## Architecture
 
@@ -109,7 +109,18 @@ not to. The rest cover the near-miss pairs, prompt injection, questions it
 should refuse to guess at, and one case that only means anything with the
 network unplugged.
 
-The harness that scores it is not built yet. See `evals/README.md`.
+The runner scores tool routing mechanically and can judge `must` / `must_not`
+answer criteria separately:
+
+```bash
+python -m evals.run --no-judge
+python -m evals.run --judge
+```
+
+The latest complete baseline on `gemini-3.5-flash-lite` passed 45 of 45 routing
+checks and 43 of 45 judged answers. The GitHub outage case is run separately
+with a deliberately broken upstream and passes both checks. See `evals/README.md`
+for filters and failure-path setup.
 
 ## Run it
 

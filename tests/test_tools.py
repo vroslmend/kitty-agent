@@ -9,6 +9,7 @@ it is the whole reason get_github_activity is in the tool set.
 import httpx
 import pytest
 
+import app.agent.tools as tool_module
 from app.agent.tools import (
     TOOLS,
     get_github_activity,
@@ -47,18 +48,33 @@ def test_list_projects_defaults_to_the_featured_ones() -> None:
 
 
 def test_list_projects_filters_on_stack() -> None:
-    result = list_projects.invoke({"topic": "terraform"})
+    result = list_projects.invoke({"topics": ["terraform"]})
     assert "Cloud Visitor Counter" in result
     assert "Check!" not in result
 
 
 def test_list_projects_filters_on_year() -> None:
-    result = list_projects.invoke({"topic": "2023"})
+    result = list_projects.invoke({"topics": ["2023"]})
     assert "Lead Tracker" in result
 
 
+def test_list_projects_resolves_this_year_in_ammars_timezone(monkeypatch) -> None:
+    monkeypatch.setattr(tool_module, "_current_year", lambda: 2026)
+
+    result = list_projects.invoke({"topics": ["this year"]})
+
+    assert "Cloud Visitor Counter" in result
+    assert "Lead Tracker" not in result
+
+
+def test_list_projects_matches_related_topics_in_one_call() -> None:
+    result = list_projects.invoke({"topics": ["realtime", "multiplayer"]})
+
+    assert "Check!" in result
+
+
 def test_list_projects_says_so_when_nothing_matches() -> None:
-    result = list_projects.invoke({"topic": "kubernetes"})
+    result = list_projects.invoke({"topics": ["kubernetes"]})
     assert "No project matches" in result
     # It still lists what does exist, so the model can offer something.
     assert "CUI Central" in result

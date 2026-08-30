@@ -1,9 +1,33 @@
-# evals
+# Evals
 
-The golden set is written before the tools exist, on purpose. A dataset written
-afterwards only ratifies whatever got built; this one is meant to argue with it.
-If a question here is hard to route, that is a finding about the tool design, not
-a question to soften.
+The golden set was written before the tools existed. A dataset written afterwards
+only ratifies whatever got built; this one is meant to argue with it. If a question
+is hard to route, that is a finding about the tool design, not a question to soften.
+
+## Run it
+
+The default run measures tool routing and skips the one case that requires GitHub
+to be deliberately unavailable:
+
+```bash
+python -m evals.run --no-judge
+```
+
+Add the answer-quality judge, or narrow a run while developing:
+
+```bash
+python -m evals.run --judge
+python -m evals.run --case write-02 --delay 0
+python -m evals.run --category route.search_writing --repetitions 3
+```
+
+`LLM_API_KEY` is required. Writing cases also require `DATABASE_URL` and an ingested
+`writing_chunks` table. Each case gets a fresh in-memory LangGraph checkpoint, so
+the clarification tool works without writing evaluation conversations to Neon.
+
+Runs are paced by default to stay friendly to the model's free tier. Use `--delay`
+to override the pause between cases. Raw JSONL and aggregate JSON reports go to
+`evals/results/`, which is ignored by Git.
 
 ## `dataset.jsonl`
 
@@ -26,16 +50,17 @@ One JSON object per line.
 `expected_tools`, honouring `allow_extra_tools`. It needs no judge and it is the
 number that goes in the README.
 
-**Answer quality** is `must` and `must_not` scored by an LLM judge. Softer, and
-worth reporting separately rather than blended into one figure.
+**Answer quality** is `must` and `must_not` scored by an optional LLM judge. It is
+softer, and is reported separately rather than blended into one figure.
 
 The two disagree usefully. An agent can pick the right tool and still answer
 badly, and the split is what tells you which half to fix.
 
 ## Cases that need setting up
 
-`gh-05` only means anything with GitHub unreachable or the token invalid. Run it
-with the network blocked. A pass is a plain sentence about the tool being
+`gh-05` only means anything with GitHub unreachable or the token invalid. The
+harness skips it unless `--include-failure-path` is passed. Run that mode with
+GitHub blocked or an invalid token. A pass is a plain sentence about the tool being
 unavailable plus a useful fallback; a fail is a hang, a raw status code, or the
 agent quietly pretending the tool returned nothing.
 

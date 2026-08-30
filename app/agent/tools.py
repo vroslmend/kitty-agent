@@ -10,6 +10,9 @@ raising. The model can relay "GitHub is not answering" to a visitor; it cannot
 do anything useful with a traceback.
 """
 
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
 import httpx
 from langchain_core.tools import tool
 from langgraph.types import interrupt
@@ -23,6 +26,18 @@ from app.rag.store import search
 TIMEOUT = httpx.Timeout(8.0, connect=4.0)
 
 GITHUB_API = "https://api.github.com"
+AMMAR_TIMEZONE = ZoneInfo("Asia/Karachi")
+
+
+def _current_year() -> int:
+    return datetime.now(AMMAR_TIMEZONE).year
+
+
+def _project_topic(topic: str) -> str:
+    cleaned = topic.lower().strip()
+    if cleaned in {"this year", "current year"}:
+        return str(_current_year())
+    return topic.strip()
 
 
 def _matches(project: dict, topic: str) -> bool:
@@ -53,24 +68,31 @@ def _render(project: dict) -> str:
 
 
 @tool
-def list_projects(topic: str | None = None) -> str:
-    """Look up the projects Ammar has built, optionally filtered by a topic.
+def list_projects(topics: list[str] | None = None) -> str:
+    """Look up the projects Ammar has built, optionally filtered by topics.
 
-    `topic` is matched against each project's name, tagline, description, tech
-    stack and year, so "python", "terraform", "2026" and "multiplayer" all
-    work. Leave it out to get the ones he features.
+    Each topic is matched against project names, taglines, descriptions, tech
+    stacks and years. Pass every relevant alternative in one call, even for a
+    single topic: ["python"], ["terraform"], or ["realtime", "multiplayer"].
+    A project matching any topic is returned. Leave the list out to get the
+    projects he features. For what he built "this year", pass ["this year"];
+    the tool resolves it to his local calendar year.
 
     Use this for anything about what he has built or what a named project is.
-    Do not use it for what he is working on right now, which is
-    get_github_activity, or for his essays, which is search_writing.
+    A calendar period such as "this year" means projects here, not recent
+    GitHub activity. Use get_github_activity only for what he is working on
+    right now or has pushed lately, and search_writing for his essays.
     """
     all_projects = projects()
-    if topic:
-        found = [p for p in all_projects if _matches(p, topic)]
+    cleaned_topics = [_project_topic(topic) for topic in topics or [] if topic.strip()]
+    if cleaned_topics:
+        found = [p for p in all_projects if any(_matches(p, topic) for topic in cleaned_topics)]
         if not found:
             names = ", ".join(p["name"] for p in all_projects)
-            return f"No project matches {topic!r}. The projects are: {names}."
-        header = f"{len(found)} project(s) matching {topic!r}:"
+            rendered = ", ".join(repr(topic) for topic in cleaned_topics)
+            return f"No project matches any of {rendered}. The projects are: {names}."
+        rendered = ", ".join(repr(topic) for topic in cleaned_topics)
+        header = f"{len(found)} project(s) matching any of {rendered}:"
     else:
         found = [p for p in all_projects if p["featured"]]
         header = f"His featured projects ({len(all_projects)} in total):"
@@ -156,8 +178,9 @@ async def get_github_activity(limit: int = 5) -> str:
     when each was last pushed to. Use this for what he is working on now, or
     lately, or whether he is still active.
 
-    Use list_projects instead for what he has built in general. This one sees
-    only recent pushes, not his whole history, and not private work.
+    Use list_projects instead for what he has built in general or built during
+    a calendar period such as "this year". This one sees only recent pushes,
+    not his whole history, and not private work.
     """
     settings = get_settings()
     headers = {"Accept": "application/vnd.github+json"}
