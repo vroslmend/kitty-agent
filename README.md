@@ -98,16 +98,10 @@ Re-run it when the portfolio's projects or writing change.
 
 ## Evals
 
-`evals/dataset.jsonl` holds 46 golden questions written against the real site,
-each with the tools that should fire and the traits the answer needs. It was
-written before the tools existed so it would shape their design rather than
-ratify it.
-
-Nineteen of the 46 expect no tool call at all. An agent that reaches for a tool
-on every turn is a common failure, and half the routing skill is knowing when
-not to. The rest cover the near-miss pairs, prompt injection, questions it
-should refuse to guess at, and one case that only means anything with the
-network unplugged.
+`evals/dataset.jsonl` contains 46 golden questions with expected tool calls and
+answer requirements. The set includes strict no-tool cases alongside cases
+where clarification or supporting lookups are allowed. It also covers routing
+near misses, prompt injection, unsupported claims, and upstream failure.
 
 The runner scores tool routing mechanically and can judge `must` / `must_not`
 answer criteria separately:

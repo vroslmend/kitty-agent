@@ -1,8 +1,7 @@
 # Evals
 
-The golden set was written before the tools existed. A dataset written afterwards
-only ratifies whatever got built; this one is meant to argue with it. If a question
-is hard to route, that is a finding about the tool design, not a question to soften.
+`dataset.jsonl` is a 46-case golden set for checking tool routing and answer
+quality.
 
 ## Run it
 
@@ -21,13 +20,13 @@ python -m evals.run --case write-02 --delay 0
 python -m evals.run --category route.search_writing --repetitions 3
 ```
 
-`LLM_API_KEY` is required. Writing cases also require `DATABASE_URL` and an ingested
-`writing_chunks` table. Each case gets a fresh in-memory LangGraph checkpoint, so
-the clarification tool works without writing evaluation conversations to Neon.
+`LLM_API_KEY` is required. Writing cases also require `DATABASE_URL` and an
+ingested `writing_chunks` table. Each case uses a fresh in-memory LangGraph
+checkpoint, so evaluation conversations are not written to Neon.
 
-Runs are paced by default to stay friendly to the model's free tier. Use `--delay`
-to override the pause between cases. Raw JSONL and aggregate JSON reports go to
-`evals/results/`, which is ignored by Git.
+Runs are paced by default to respect provider rate limits. Use `--delay` to
+override the pause between cases. Raw JSONL and aggregate JSON reports are
+written to `evals/results/`, which is ignored by Git.
 
 ## `dataset.jsonl`
 
@@ -35,62 +34,25 @@ One JSON object per line.
 
 | Field | Meaning |
 |---|---|
-| `id` | Stable. Never renumber, results are compared across runs |
-| `question` | Exactly what the user types, lowercase and typos included where real |
-| `category` | Slice for reporting. `route.*`, `honesty`, `ambiguous`, `injection`, `out_of_scope`, `failure_path` |
-| `expected_tools` | The tools that should fire. `[]` means the agent should answer without calling anything |
-| `allow_extra_tools` | Whether calling more than `expected_tools` still passes |
-| `must` | Traits the answer needs. Judged by the model, not matched literally |
-| `must_not` | Traits that fail the case outright |
-| `notes` | Why the case exists, and any trap it is set for |
+| `id` | Stable identifier used to compare runs. |
+| `question` | User input, including intentional casing and typos. |
+| `category` | Reporting slice, such as `route.*`, `honesty`, or `failure_path`. |
+| `expected_tools` | Required tool calls. An empty list requires no tool call. |
+| `allow_extra_tools` | Whether additional tool calls are permitted. |
+| `must` | Required answer traits for the optional judge. |
+| `must_not` | Disallowed answer traits for the optional judge. |
+| `notes` | Maintenance guidance for the case. |
 
-## What gets measured
+## Scoring
 
-**Tool-choice accuracy** is mechanical: compare the tools that fired against
-`expected_tools`, honouring `allow_extra_tools`. It needs no judge and it is the
-number that goes in the README.
+- **Tool routing** is scored mechanically against `expected_tools`, respecting
+  `allow_extra_tools`. It does not require a judge.
+- **Answer quality** is scored separately by the optional LLM judge against
+  `must` and `must_not`.
 
-**Answer quality** is `must` and `must_not` scored by an optional LLM judge. It is
-softer, and is reported separately rather than blended into one figure.
+## Failure-path case
 
-The two disagree usefully. An agent can pick the right tool and still answer
-badly, and the split is what tells you which half to fix.
-
-## Cases that need setting up
-
-`gh-05` only means anything with GitHub unreachable or the token invalid. The
-harness skips it unless `--include-failure-path` is passed. Run that mode with
-GitHub blocked or an invalid token. A pass is a plain sentence about the tool being
-unavailable plus a useful fallback; a fail is a hang, a raw status code, or the
-agent quietly pretending the tool returned nothing.
-
-## Counts
-
-46 cases.
-
-| Category | Cases |
-|---|---|
-| `route.search_writing` | 6 |
-| `route.list_projects` | 6 |
-| `route.suggest_navigation` | 4 |
-| `route.get_github_activity` | 3 |
-| `route.get_now_playing` | 2 |
-| `route.multi` | 4 |
-| `route.none` | 4 |
-| `honesty` | 6 |
-| `injection` | 4 |
-| `ambiguous` | 3 |
-| `out_of_scope` | 3 |
-| `failure_path` | 1 |
-
-19 of the 46 expect no tool call at all. That ratio is deliberate: an agent that
-reaches for a tool on every turn is a common and unimpressive failure, and half
-the routing skill is knowing when not to.
-
-Counting appearances rather than cases, including multi-tool ones: `search_writing`
-8, `list_projects` 8, `get_github_activity` 7, `suggest_navigation` 5,
-`get_now_playing` 3.
-
-The injection and honesty cases are not padding. A public unauthenticated
-endpoint that will invent a phone number or repeat its own prompt is a worse
-problem than one that picks the wrong tool.
+`gh-05` is meaningful only when GitHub is unreachable or the token is invalid.
+The harness skips it unless `--include-failure-path` is passed. Run that mode
+with GitHub blocked or an invalid token. A passing response explains that the
+source is unavailable and offers a useful fallback without exposing raw errors.
