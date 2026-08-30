@@ -12,6 +12,7 @@ do anything useful with a traceback.
 
 import httpx
 from langchain_core.tools import tool
+from langgraph.types import interrupt
 
 from app.config import get_settings
 from app.content import pages, projects, site
@@ -212,10 +213,27 @@ async def search_writing(query: str) -> str:
     return "\n\n".join(passages)
 
 
+@tool
+def ask_clarification(question: str, options: list[str]) -> str:
+    """Ask the visitor which of several things they meant, and wait for them.
+
+    Use this when a question could reasonably point at more than one project,
+    essay or page, and picking wrong would send them somewhere useless. Pass
+    one short question and the candidates you are choosing between, named as
+    the visitor would recognise them. Their answer comes back as the result.
+
+    Do not use it to be polite about a question you can answer, and do not
+    guess and then ask. Call it on its own: the other tools in the same turn
+    run a second time when the visitor replies.
+    """
+    return interrupt({"question": question, "options": options})
+
+
 TOOLS = [
     search_writing,
     list_projects,
     suggest_navigation,
     get_now_playing,
     get_github_activity,
+    ask_clarification,
 ]

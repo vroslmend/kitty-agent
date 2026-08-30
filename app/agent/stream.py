@@ -9,12 +9,13 @@ import logging
 from collections.abc import AsyncIterator
 
 from langchain_core.messages import HumanMessage
+from langgraph.types import Command
 from pydantic import BaseModel
 
 from app.agent.graph import RECURSION_LIMIT, build_graph
 from app.config import Settings
 from app.db import get_checkpointer
-from app.models import StepEvent, TokenEvent
+from app.models import QuestionEvent, StepEvent, TokenEvent
 
 # What the visitor sees while a tool runs. Without these the panel sits blank
 # through the slowest part of the answer, which reads as broken.
@@ -25,6 +26,10 @@ STEP_LABELS = {
     "get_now_playing": "checking spotify",
     "get_github_activity": "checking github",
 }
+
+# The question this one asks is the output the visitor sees. A chip announcing
+# that it is about to ask, followed by the question, reads as a stutter.
+SILENT_TOOLS = {"ask_clarification"}
 
 BUSY = "too many people are talking to me at once. try again in a minute."
 BROKEN = "something went wrong on my end."
@@ -69,12 +74,25 @@ async def run(message: str, thread_id: str, settings: Settings) -> AsyncIterator
         "recursion_limit": RECURSION_LIMIT,
         "configurable": {"thread_id": thread_id},
     }
-    state = {"messages": [HumanMessage(content=message)]}
+    # aget_state needs somewhere to have saved state. Without a database the
+    # graph is compiled without a checkpointer, and asking it raises.
+    remembers = bool(settings.database_url)
 
     try:
-        async for event in graph.astream_events(state, config):
+        # A thread that stopped on a question is waiting for an answer, not for
+        # another question. Resuming hands the reply back as the paused tool's
+        # result; appending it as a new turn would leave the run paused forever
+        # and answer nothing.
+        paused = (await graph.aget_state(config)).interrupts if remembers else ()
+        graph_input = (
+            Command(resume=message) if paused else {"messages": [HumanMessage(content=message)]}
+        )
+
+        async for event in graph.astream_events(graph_input, config):
             kind = event["event"]
             if kind == "on_tool_start":
+                if event["name"] in SILENT_TOOLS:
+                    continue
                 label = STEP_LABELS.get(event["name"], event["name"].replace("_", " "))
                 yield StepEvent(label=label)
             elif kind == "on_chat_model_stream":
@@ -82,6 +100,12 @@ async def run(message: str, thread_id: str, settings: Settings) -> AsyncIterator
                 # the answer has any, so an empty string here is not an error.
                 if text := getattr(event["data"]["chunk"], "text", ""):
                     yield TokenEvent(text=str(text))
+
+        if remembers:
+            for pending in (await graph.aget_state(config)).interrupts:
+                yield QuestionEvent(
+                    text=pending.value["question"], options=pending.value["options"]
+                )
     except Exception as error:  # noqa: BLE001
         # A public endpoint must never show a visitor a traceback, and the
         # napping fallback is for a missing key, not for a failure mid answer.

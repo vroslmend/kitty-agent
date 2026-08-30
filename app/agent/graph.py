@@ -12,7 +12,7 @@ from langgraph.prebuilt import ToolNode
 
 from app.agent.prompts import SYSTEM_PROMPT
 from app.agent.state import AgentState
-from app.agent.tools import TOOLS
+from app.agent.tools import TOOLS, ask_clarification
 from app.config import Settings
 
 # A call and its result are two steps, so this is roughly four rounds of tool
@@ -36,11 +36,16 @@ def build_graph(settings: Settings, checkpointer=None):
     turns. That is the right shape for tests, which should not need a database
     to prove the loop routes correctly.
     """
+    # ask_clarification pauses the run with interrupt(), which has nowhere to
+    # persist to without a checkpointer. Offering it anyway would raise the
+    # first time a vague question arrived, so it disappears instead.
+    tools = TOOLS if checkpointer else [t for t in TOOLS if t is not ask_clarification]
+
     llm = ChatGoogleGenerativeAI(
         model=settings.llm_model,
         google_api_key=settings.llm_api_key,
         max_output_tokens=settings.max_tokens_per_request,
-    ).bind_tools(TOOLS)
+    ).bind_tools(tools)
 
     async def agent(state: AgentState) -> dict:
         # Prepended per call rather than stored in state. Kept in state it would
@@ -50,7 +55,7 @@ def build_graph(settings: Settings, checkpointer=None):
 
     builder = StateGraph(AgentState)
     builder.add_node("agent", agent)
-    builder.add_node("tools", ToolNode(TOOLS))
+    builder.add_node("tools", ToolNode(tools))
     builder.add_edge(START, "agent")
     builder.add_conditional_edges("agent", should_continue, {"tools": "tools", END: END})
     builder.add_edge("tools", "agent")

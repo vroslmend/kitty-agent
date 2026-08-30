@@ -10,8 +10,9 @@ It is an agent rather than a retrieval chatbot on purpose. Retrieval is one of
 its tools, and the graph decides when to reach for it.
 
 **In progress.** The agent answers over `/chat`, streams its steps, remembers
-across turns, and has all five tools. Still to come: a clarifying question when
-a request is ambiguous, the harness that scores the golden set, and the widget.
+across turns, has all five tools, and pauses to ask which one you meant when a
+question is vague. Still to come: the harness that scores the golden set, and
+the widget.
 
 ## Architecture
 
@@ -80,6 +81,7 @@ link, not a list of his recent commits.
 | `get_now_playing` | What he is listening to, or last listened to. |
 | `get_github_activity` | What he has pushed recently. |
 | `search_writing` | His essays, over pgvector. |
+| `ask_clarification` | Nothing. It stops the run and asks the visitor which one they meant. |
 
 The two that reach the network return a sentence on failure rather than
 raising. The model can relay that GitHub is rate limiting to a visitor; it can
@@ -165,7 +167,7 @@ Everything is read once at boot through `pydantic-settings`. See `.env.example`.
 | `NOW_PLAYING_URL` | The portfolio's Spotify proxy, so the refresh token lives in one place. |
 | `GITHUB_USERNAME` / `GITHUB_TOKEN` | The token is optional and needs no scopes. Without it GitHub allows 60 requests an hour shared across every visitor. |
 | `SITE_BASE_URL` | The portfolio's origin. |
-| `MAX_TOKENS_PER_REQUEST` | Cost ceiling. Declared, not yet enforced. |
+| `MAX_TOKENS_PER_REQUEST` | Cost ceiling, applied as the model's output cap. |
 | `RATE_LIMIT_PER_MINUTE` | Requests per client per minute on `/chat`. Enforced. Over it returns 429. |
 
 The model default is a constraint, not a preference. Every full Gemini Flash
@@ -183,6 +185,7 @@ that costs in answer quality.
 |---|---|---|
 | `step` | `label` | The agent started doing something. Renders as a chip. |
 | `token` | `text` | A piece of the answer. |
+| `question` | `text`, `options` | The agent stopped to ask which one. Reply on the same thread. |
 | `done` | `thread_id` | Finished. Send this `thread_id` back to continue the conversation. |
 | `error` | `message` | Something failed. |
 
@@ -197,6 +200,14 @@ single statement holding a per-client advisory lock, so instances racing on the
 same client cannot each read the same under-limit count and both admit a
 request. If the database is unreachable the in-process window still applies:
 degraded to per instance, never absent.
+
+A turn ends on either an answer or a `question`, and `done` follows both. When
+it ends on a question the run is paused rather than finished: it is sitting in
+the checkpointer mid tool call, and the next `POST /chat` on that `thread_id`
+is the reply. There is no resume flag and no second endpoint, because the
+server can see from the saved state that the thread is waiting. Whatever the
+visitor sends is handed back as the paused tool's result and the run carries on
+from where it stopped.
 
 This shape is the contract. What produces the events will change; the events
 will not, so the widget can be written against them now.

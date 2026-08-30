@@ -22,6 +22,18 @@ class TokenEvent(BaseModel):
     text: str
 
 
+class QuestionEvent(BaseModel):
+    """The agent stopped to ask which of several things was meant.
+
+    The turn ends on this rather than on an answer. The visitor's next message
+    on the same thread_id is the reply, and it resumes the paused run.
+    """
+
+    type: Literal["question"] = "question"
+    text: str
+    options: list[str] = Field(default_factory=list)
+
+
 class DoneEvent(BaseModel):
     type: Literal["done"] = "done"
     thread_id: str
