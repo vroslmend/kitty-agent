@@ -1,10 +1,17 @@
-# kitty
+<p align="center">
+  <img src="assets/kitty-mark.svg" width="120" alt="kitty, a line-art cat standing on a hairline">
+</p>
 
-[![CI](https://github.com/vroslmend/kitty-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/vroslmend/kitty-agent/actions/workflows/ci.yml)
+<h1 align="center">kitty</h1>
 
-The on-site agent for [ammarhassan.dev](https://ammarhassan.dev). A LangGraph
-tool-calling agent behind a FastAPI server, streaming its steps to a chat widget
-in the portfolio.
+<p align="center">The on-site agent for <a href="https://ammarhassan.dev">ammarhassan.dev</a>.</p>
+
+<p align="center">
+  <a href="https://github.com/vroslmend/kitty-agent/actions/workflows/ci.yml"><img src="https://github.com/vroslmend/kitty-agent/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+</p>
+
+A LangGraph tool-calling agent behind a FastAPI server, streaming its steps to
+the kitty widget in the portfolio.
 
 It is an agent rather than a retrieval chatbot on purpose. Retrieval is one of
 its tools, and the graph decides when to reach for it.
@@ -237,3 +244,7 @@ holds no local state, so a container host is a fallback rather than a rewrite.
 Then set `NEXT_PUBLIC_KITTY_API_URL` in the portfolio to the deployed URL. Unset
 means the widget stays hidden, the same convention the visitor counter and
 now-playing widget use.
+
+## Credits
+
+The “Cat” icon used in the mark is by [inmyheart](https://thenounproject.com/icon/match/cat-8273692/), from [Noun Project](https://thenounproject.com/browse/icons/term/cat/) (CC BY 3.0).
