@@ -11,15 +11,15 @@ its tools, and the graph decides when to reach for it.
 
 **In progress.** The production API answers over `/chat`, streams its steps,
 remembers across turns, has all five information tools, and pauses to clarify
-vague questions. The evaluation runner is in place. Still to come: the portfolio
-widget, the MCP surface, and final polish.
+vague questions. The portfolio widget consumes that stream, and the evaluation
+runner is in place. Still to come: the MCP surface and final polish.
 
 ## Architecture
 
 ```mermaid
 flowchart LR
     subgraph pf["portfolio-v2 · Next.js on Vercel"]
-        widget["kitty-chat.tsx"]
+        widget["kitty widget"]
     end
 
     subgraph ka["kitty-agent · Python on Vercel"]
@@ -31,7 +31,7 @@ flowchart LR
     end
 
     widget -->|"POST /chat"| api
-    api -.->|"SSE: step, token, done"| widget
+    api -.->|"SSE: step, token, question, done"| widget
 ```
 
 Two repos and two deploys. The portfolio is a static Next.js site and this is a
@@ -188,7 +188,7 @@ that costs in answer quality.
 
 | `type` | Payload | Meaning |
 |---|---|---|
-| `step` | `label` | The agent started doing something. Renders as a chip. |
+| `step` | `label` | The agent started a lookup. Renders as the current status. |
 | `token` | `text` | A piece of the answer. |
 | `question` | `text`, `options` | The agent stopped to ask which one. Reply on the same thread. |
 | `done` | `thread_id` | Finished. Send this `thread_id` back to continue the conversation. |
@@ -214,8 +214,8 @@ server can see from the saved state that the thread is waiting. Whatever the
 visitor sends is handed back as the paused tool's result and the run carries on
 from where it stopped.
 
-This shape is the contract. What produces the events will change; the events
-will not, so the widget can be written against them now.
+This shape is the contract. What produces the events can change without making
+the portfolio widget learn a new protocol.
 
 ## Deploy
 
