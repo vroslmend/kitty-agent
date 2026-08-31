@@ -1,14 +1,10 @@
 <p align="center">
-  <img src="assets/kitty-mark.svg" width="120" alt="kitty, a line-art cat standing on a hairline">
+  <img src="assets/kitty-mark.svg" width="144" alt="kitty, a small line-art cat">
 </p>
 
 <h1 align="center">kitty</h1>
 
 <p align="center">The on-site agent for <a href="https://ammarhassan.dev">ammarhassan.dev</a>.</p>
-
-<p align="center">
-  <a href="https://github.com/vroslmend/kitty-agent/actions/workflows/ci.yml"><img src="https://github.com/vroslmend/kitty-agent/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-</p>
 
 A LangGraph tool-calling agent behind a FastAPI server, streaming its steps to
 the kitty widget in the portfolio.
@@ -20,6 +16,8 @@ its tools, and the graph decides when to reach for it.
 remembers across turns, has all five information tools, and pauses to clarify
 vague questions. The portfolio widget consumes that stream, and the evaluation
 runner is in place. Still to come: the MCP surface and final polish.
+
+[![CI](https://github.com/vroslmend/kitty-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/vroslmend/kitty-agent/actions/workflows/ci.yml)
 
 ## Architecture
 
