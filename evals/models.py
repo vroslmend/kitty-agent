@@ -7,6 +7,7 @@ class EvalCase(BaseModel):
     id: str
     question: str
     category: str
+    context: list[str] = Field(default_factory=list)
     expected_tools: list[str] = Field(default_factory=list)
     allow_extra_tools: bool = False
     must: list[str] = Field(default_factory=list)

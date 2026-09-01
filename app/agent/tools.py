@@ -110,6 +110,9 @@ def suggest_navigation(topic: str) -> str:
     This points at a destination, it does not answer the question. If they
     asked what he has written about, use search_writing instead; if they asked
     to be taken to the writing, use this.
+
+    Give the visitor the destination as a markdown link, [his writing](/writing),
+    never as a bare path in a sentence. A path they cannot click is not an answer.
     """
     query = topic.lower().strip()
     links = site()["links"]

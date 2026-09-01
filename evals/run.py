@@ -99,6 +99,11 @@ async def evaluate_case(graph, case: EvalCase, repetition: int = 1) -> EvalResul
     }
 
     try:
+        # Only the last turn is graded. The rest are there so the model has
+        # something to be terse about, which is what these cases are testing.
+        for earlier in case.context:
+            await graph.ainvoke({"messages": [HumanMessage(content=earlier)]}, config)
+
         async for event in graph.astream_events(
             {"messages": [HumanMessage(content=case.question)]}, config
         ):
