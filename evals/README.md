@@ -1,6 +1,6 @@
 # Evals
 
-`dataset.jsonl` is a 46-case golden set for checking tool routing and answer
+`dataset.jsonl` is a 54-case golden set for checking tool routing and answer
 quality.
 
 ## Run it
@@ -36,6 +36,7 @@ One JSON object per line.
 |---|---|
 | `id` | Stable identifier used to compare runs. |
 | `question` | User input, including intentional casing and typos. |
+| `context` | Earlier visitor turns played on the same thread first. Only `question` is scored. |
 | `category` | Reporting slice, such as `route.*`, `honesty`, or `failure_path`. |
 | `expected_tools` | Required tool calls. An empty list requires no tool call. |
 | `allow_extra_tools` | Whether additional tool calls are permitted. |

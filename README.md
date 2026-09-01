@@ -97,9 +97,9 @@ Re-run it when the portfolio's projects or writing change.
 
 ## Evals
 
-`evals/dataset.jsonl` contains 46 golden questions covering tool-free answers,
-routing near misses, clarification, prompt injection, unsupported claims, and
-upstream failure.
+`evals/dataset.jsonl` contains 54 golden questions covering tool-free answers,
+routing near misses, clarification, prompt injection, unsupported claims,
+upstream failure, voice, and multi-turn conversation.
 
 The runner scores tool routing mechanically and can judge `must` / `must_not`
 answer criteria separately:
