@@ -39,6 +39,10 @@ app.add_middleware(
 
 NAPPING = "kitty's napping right now. try again in a bit."
 
+# asyncio keeps only a weak reference to a running task, so a loose one can be
+# collected mid-flight. Holding it here is what keeps the wake alive.
+waking: set[asyncio.Task] = set()
+
 
 def sse(event: BaseModel) -> str:
     # Two trailing newlines, or the client holds the frame waiting for a
@@ -46,8 +50,28 @@ def sse(event: BaseModel) -> str:
     return f"data: {event.model_dump_json()}\n\n"
 
 
+async def wake_database() -> None:
+    try:
+        pool = await get_pool()
+        async with pool.connection() as connection:
+            await connection.execute("SELECT 1")
+    except Exception:  # noqa: BLE001
+        # A database that cannot be reached is what this is trying to wake, and
+        # /health answers about the service either way.
+        pass
+
+
 @app.get("/health", response_model=HealthResponse)
 async def health() -> HealthResponse:
+    # The portfolio pings this on page load. Vercel and Neon both scale to zero
+    # and their cold starts stack, so waking the instance alone leaves half the
+    # wait in place. Fired loose rather than awaited: starting it is the point,
+    # and the platform's own probes should not pay for Neon.
+    if settings.database_url:
+        task = asyncio.create_task(wake_database())
+        waking.add(task)
+        task.add_done_callback(waking.discard)
+
     return HealthResponse(
         service=settings.app_name,
         environment=settings.environment,

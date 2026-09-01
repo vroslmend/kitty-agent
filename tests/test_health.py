@@ -1,10 +1,12 @@
 """Smoke tests: the service boots, CORS is wired, SSE frames parse."""
 
+import asyncio
 import json
 
 import pytest
 from fastapi.testclient import TestClient
 
+from app import main
 from app.main import NAPPING, app
 
 client = TestClient(app)
@@ -22,6 +24,42 @@ def test_health_reports_agent_not_ready_without_a_key():
     # No LLM_API_KEY in the test env, so the agent must advertise itself as down
     # rather than claiming readiness it does not have.
     assert client.get("/health").json()["agent_ready"] is False
+
+
+async def _noop() -> None:
+    pass
+
+
+def test_health_leaves_the_database_alone_when_there_is_none(monkeypatch):
+    def explode():
+        raise AssertionError("nothing to wake without DATABASE_URL")
+
+    monkeypatch.setattr(main.settings, "database_url", "")
+    monkeypatch.setattr(main, "wake_database", explode)
+    assert client.get("/health").status_code == 200
+
+
+def test_health_wakes_the_database_when_configured(monkeypatch):
+    # Called synchronously by the handler, so this does not race the loose task.
+    called = []
+
+    def wake():
+        called.append(True)
+        return _noop()
+
+    monkeypatch.setattr(main.settings, "database_url", "postgres://pinned")
+    monkeypatch.setattr(main, "wake_database", wake)
+
+    assert client.get("/health").status_code == 200
+    assert called
+
+
+def test_waking_the_database_swallows_an_unreachable_one(monkeypatch):
+    async def refuse():
+        raise OSError("connection refused")
+
+    monkeypatch.setattr(main, "get_pool", refuse)
+    asyncio.run(main.wake_database())
 
 
 def parse_sse(body: str) -> list[dict]:
