@@ -1,25 +1,25 @@
-# kitty
+<p align="center">
+  <img src="assets/kitty-mark.svg" width="144" alt="kitty, a small line-art cat">
+</p>
 
-[![CI](https://github.com/vroslmend/kitty-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/vroslmend/kitty-agent/actions/workflows/ci.yml)
+<h1 align="center">kitty</h1>
 
-The on-site agent for [ammarhassan.dev](https://ammarhassan.dev). A LangGraph
-tool-calling agent behind a FastAPI server, streaming its steps to a chat widget
-in the portfolio.
+<div align="center">
+  <p>The on-site agent for <a href="https://ammarhassan.dev">ammarhassan.dev</a>.</p>
 
-It is an agent rather than a retrieval chatbot on purpose. Retrieval is one of
-its tools, and the graph decides when to reach for it.
+  <p>A LangGraph tool-calling agent behind a FastAPI server,<br>streaming its steps to the kitty widget in the portfolio.</p>
 
-**In progress.** The production API answers over `/chat`, streams its steps,
-remembers across turns, has all five information tools, and pauses to clarify
-vague questions. The evaluation runner is in place. Still to come: the portfolio
-widget, the MCP surface, and final polish.
+  <p>Retrieval is one of its tools, not the shape of the program.</p>
+
+  <p><a href="https://github.com/vroslmend/kitty-agent/actions/workflows/ci.yml"><img src="https://github.com/vroslmend/kitty-agent/actions/workflows/ci.yml/badge.svg" alt="CI"></a></p>
+</div>
 
 ## Architecture
 
 ```mermaid
 flowchart LR
     subgraph pf["portfolio-v2 · Next.js on Vercel"]
-        widget["kitty-chat.tsx"]
+        widget["kitty widget"]
     end
 
     subgraph ka["kitty-agent · Python on Vercel"]
@@ -31,16 +31,15 @@ flowchart LR
     end
 
     widget -->|"POST /chat"| api
-    api -.->|"SSE: step, token, done"| widget
+    api -.->|"SSE: step, token, question, done"| widget
 ```
 
-Two repos and two deploys. The portfolio is a static Next.js site and this is a
-Python service, so they have nothing to share but an HTTP contract. It mirrors
-`cloud-visitor-counter`, which is also consumed client side.
+Two repositories and two deployments. The portfolio is a Next.js frontend and
+this repository is a Python service; the HTTP contract is their only coupling.
 
-Both halves run on Vercel, but as separate projects. This one is a single
-Python function, so it holds no state between requests and conversation memory
-lives in Postgres rather than in the process.
+Both deploy to Vercel as separate projects. This service runs as a single
+Python function, while conversation memory lives in Postgres rather than
+depending on a warm process.
 
 ## The loop
 
@@ -98,10 +97,9 @@ Re-run it when the portfolio's projects or writing change.
 
 ## Evals
 
-`evals/dataset.jsonl` contains 46 golden questions with expected tool calls and
-answer requirements. The set includes strict no-tool cases alongside cases
-where clarification or supporting lookups are allowed. It also covers routing
-near misses, prompt injection, unsupported claims, and upstream failure.
+`evals/dataset.jsonl` contains 46 golden questions covering tool-free answers,
+routing near misses, clarification, prompt injection, unsupported claims, and
+upstream failure.
 
 The runner scores tool routing mechanically and can judge `must` / `must_not`
 answer criteria separately:
@@ -111,10 +109,7 @@ python -m evals.run --no-judge
 python -m evals.run --judge
 ```
 
-The latest complete baseline on `gemini-3.5-flash-lite` passed 45 of 45 routing
-checks and 43 of 45 judged answers. The GitHub outage case is run separately
-with a deliberately broken upstream and passes both checks. See `evals/README.md`
-for filters and failure-path setup.
+See `evals/README.md` for filters, reports, scoring, and failure-path setup.
 
 ## Run it
 
@@ -155,8 +150,7 @@ like a single blob.
 ```
 
 Nothing in the suite calls a model or the network. The tests deliberately do
-not read `.env`, so they run on the same defaults CI sees. To check a change
-the way CI will, move `.env` aside first.
+not read `.env`, so they run on the same defaults CI sees.
 
 ## Configuration
 
@@ -167,19 +161,13 @@ Everything is read once at boot through `pydantic-settings`. See `.env.example`.
 | `ENVIRONMENT` | Reported by `/health`. |
 | `ALLOWED_ORIGINS` | Comma separated CORS origins. |
 | `LLM_API_KEY` | Empty means `/chat` returns the napping fallback rather than an error. |
-| `LLM_MODEL` | Default `gemini-3.5-flash-lite`. See below. |
-| `DATABASE_URL` | Neon, pooled. Checkpoints and pgvector. |
+| `LLM_MODEL` | Default `gemini-3.5-flash-lite`. |
+| `DATABASE_URL` | Neon, pooled. Checkpoints, rate limits, and pgvector. |
 | `NOW_PLAYING_URL` | The portfolio's Spotify proxy, so the refresh token lives in one place. |
 | `GITHUB_USERNAME` / `GITHUB_TOKEN` | The token is optional and needs no scopes. Without it GitHub allows 60 requests an hour shared across every visitor. |
 | `SITE_BASE_URL` | The portfolio's origin. |
 | `MAX_TOKENS_PER_REQUEST` | Cost ceiling, applied as the model's output cap. |
 | `RATE_LIMIT_PER_MINUTE` | Requests per client per minute on `/chat`. Enforced. Over it returns 429. |
-
-The model default is a constraint, not a preference. Every full Gemini Flash
-model allows 20 requests a day on the free tier, which one pass over the golden
-set would exhaust and which no public endpoint could serve. The Lite models
-allow 500 a day. Quotas are per model, so the eval harness gets to decide what
-that costs in answer quality.
 
 ## The `/chat` protocol
 
@@ -188,7 +176,7 @@ that costs in answer quality.
 
 | `type` | Payload | Meaning |
 |---|---|---|
-| `step` | `label` | The agent started doing something. Renders as a chip. |
+| `step` | `label` | The agent started a lookup. Renders as the current status. |
 | `token` | `text` | A piece of the answer. |
 | `question` | `text`, `options` | The agent stopped to ask which one. Reply on the same thread. |
 | `done` | `thread_id` | Finished. Send this `thread_id` back to continue the conversation. |
@@ -214,14 +202,14 @@ server can see from the saved state that the thread is waiting. Whatever the
 visitor sends is handed back as the paused tool's result and the run carries on
 from where it stopped.
 
-This shape is the contract. What produces the events will change; the events
-will not, so the widget can be written against them now.
+This shape is the contract. What produces the events can change without making
+the portfolio widget learn a new protocol.
 
 ## Deploy
 
-Vercel, as its own project pointed at this repo. The FastAPI preset finds
-`app/main.py` on its own, so no build configuration is needed. `vercel.json`
-only caps the function duration and keeps tests and fixtures out of the bundle.
+Vercel, as its own project pointed at this repository. Vercel detects
+`app/main.py` automatically, so no build command is needed. `vercel.json` caps
+the function duration and keeps development files out of the bundle.
 
 1. Import the repo at [vercel.com/new](https://vercel.com/new) with no
    environment variables. An empty `LLM_API_KEY` means the service comes up in
@@ -229,11 +217,21 @@ only caps the function duration and keeps tests and fixtures out of the bundle.
    hosting without exposing anything.
 2. Attach Neon from the project's Storage tab. It writes `DATABASE_URL` in.
 3. Add `LLM_API_KEY`, and set `ALLOWED_ORIGINS` to the portfolio's origin.
+4. With the production `DATABASE_URL` available locally, initialize Postgres:
+
+   ```bash
+   python -m app.db setup
+   python -m app.rag.ingest
+   ```
 
 The Dockerfile is kept for local runs and portability. It is not what Vercel
 builds, and the service is deliberately host agnostic: it binds `PORT` and
-holds no local state, so a container host is a fallback rather than a rewrite.
+keeps durable state in Postgres, so a container host is a fallback rather than
+a rewrite.
 
-Then set `NEXT_PUBLIC_KITTY_API_URL` in the portfolio to the deployed URL. Unset
-means the widget stays hidden, the same convention the visitor counter and
-now-playing widget use.
+Then set `NEXT_PUBLIC_KITTY_API_URL` in the portfolio to the deployed URL. When
+it is unset, the widget stays hidden.
+
+## Credits
+
+The “Cat” icon used in the mark is by [inmyheart](https://thenounproject.com/icon/match/cat-8273692/), from [Noun Project](https://thenounproject.com/browse/icons/term/cat/) (CC BY 3.0).
