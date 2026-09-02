@@ -1,6 +1,6 @@
 # Evals
 
-`dataset.jsonl` is a 54-case golden set for checking tool routing and answer
+`dataset.jsonl` is a 58-case golden set for checking tool routing and answer
 quality.
 
 ## Run it

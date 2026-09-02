@@ -25,8 +25,16 @@ from app.agent.graph import RECURSION_LIMIT, build_graph
 from app.config import get_settings
 from app.db import close_pool, use_selector_loop_on_windows
 from evals.judge import AnswerJudge
-from evals.models import Clarification, EvalCase, EvalResult, EvalSummary, TokenUsage, ToolCall
-from evals.scoring import route_passes, summarize
+from evals.models import (
+    Clarification,
+    EvalCase,
+    EvalResult,
+    EvalSummary,
+    Exchange,
+    TokenUsage,
+    ToolCall,
+)
+from evals.scoring import invented_links, route_passes, summarize
 
 DEFAULT_DATASET = Path(__file__).with_name("dataset.jsonl")
 DEFAULT_OUTPUT_DIR = Path(__file__).with_name("results")
@@ -88,6 +96,7 @@ def _judge_answer(result: EvalResult) -> str:
 async def evaluate_case(graph, case: EvalCase, repetition: int = 1) -> EvalResult:
     started = time.perf_counter()
     actual_tools: list[str] = []
+    earlier_turns: list[Exchange] = []
     tool_calls: list[ToolCall] = []
     answer_chunks: list[str] = []
     usage_by_run: dict[str, dict] = {}
@@ -101,8 +110,14 @@ async def evaluate_case(graph, case: EvalCase, repetition: int = 1) -> EvalResul
     try:
         # Only the last turn is graded. The rest are there so the model has
         # something to be terse about, which is what these cases are testing.
+        # Its own replies are kept: a tic is only visible against them, and the
+        # judge cannot see a repetition it was never shown.
         for earlier in case.context:
-            await graph.ainvoke({"messages": [HumanMessage(content=earlier)]}, config)
+            state = await graph.ainvoke({"messages": [HumanMessage(content=earlier)]}, config)
+            reply = state["messages"][-1]
+            earlier_turns.append(
+                Exchange(visitor=earlier, kitty=str(getattr(reply, "text", "") or ""))
+            )
 
         async for event in graph.astream_events(
             {"messages": [HumanMessage(content=case.question)]}, config
@@ -136,18 +151,35 @@ async def evaluate_case(graph, case: EvalCase, repetition: int = 1) -> EvalResul
         repetition=repetition,
         category=case.category,
         question=case.question,
+        earlier_turns=earlier_turns,
         expected_tools=case.expected_tools,
         actual_tools=actual_tools,
         tool_calls=tool_calls,
         allow_extra_tools=case.allow_extra_tools,
         route_passed=route_passes(case, actual_tools) if error_message is None else False,
-        answer="".join(answer_chunks).strip(),
+        answer=(answer := "".join(answer_chunks).strip()),
+        invented_links=invented_links(answer),
         clarification=clarification,
         latency_ms=round((time.perf_counter() - started) * 1000),
         agent_usage=_usage_from_runs(usage_by_run),
         error=error_message,
     )
     return result
+
+
+def _apply_mechanical_checks(result: EvalResult) -> None:
+    """Overrule the judge on the two things it demonstrably gets wrong.
+
+    It passed an empty answer, and it cannot know whether a site path is real.
+    """
+    if result.judge is None:
+        return
+    if result.invented_links:
+        result.judge.passed = False
+        result.judge.violations.append(f"invented site path(s): {', '.join(result.invented_links)}")
+    if not result.answer and not result.clarification:
+        result.judge.passed = False
+        result.judge.violations.append("answered with nothing at all")
 
 
 def skipped_result(case: EvalCase, repetition: int, reason: str) -> EvalResult:
@@ -292,10 +324,11 @@ async def async_main(args: argparse.Namespace) -> int:
             if judge and not result.error:
                 try:
                     result.judge, result.judge_usage = await judge.judge(
-                        case, _judge_answer(result)
+                        case, _judge_answer(result), result.earlier_turns
                     )
                 except Exception as error:  # noqa: BLE001
                     result.judge_error = f"{type(error).__name__}: {error}"
+                _apply_mechanical_checks(result)
             results.append(result)
             if delay and position < len(runs):
                 await asyncio.sleep(delay)
