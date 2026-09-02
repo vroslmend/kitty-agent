@@ -6,6 +6,7 @@ trailing newline instead of two streams nothing and looks like a hang.
 """
 
 import logging
+import re
 from collections.abc import AsyncIterator
 
 from langchain_core.messages import HumanMessage
@@ -13,6 +14,7 @@ from langgraph.types import Command
 from pydantic import BaseModel
 
 from app.agent.graph import RECURSION_LIMIT, build_graph
+from app.agent.prompts import NEVER_SPEAK
 from app.config import Settings
 from app.db import get_checkpointer
 from app.models import QuestionEvent, StepEvent, TokenEvent
@@ -33,8 +35,35 @@ SILENT_TOOLS = {"ask_clarification"}
 
 BUSY = "too many people are talking to me at once. try again in a minute."
 BROKEN = "something went wrong on my end."
+TANGLED = "that came out wrong. ask me again?"
+EMPTY = "nothing came back that time. ask me again?"
+
+# Hold this much of the answer back before releasing any of it. A leak is a
+# whole-answer event that is recognisable from its opening words, so checking
+# the head catches it while the rest still streams. It delays the first token
+# on short answers; the step labels, which are the part worth watching, are
+# unaffected.
+LEAK_GUARD_CHARS = 160
+
+# Long enough that ordinary phrasing cannot collide by accident, short enough
+# that a leak cannot slip through by rewording an edge.
+LEAK_RUN_WORDS = 8
 
 log = logging.getLogger(__name__)
+
+
+def _runs(text: str, n: int = LEAK_RUN_WORDS) -> set[tuple[str, ...]]:
+    words = re.findall(r"[a-z0-9']+", text.lower())
+    return {tuple(words[i : i + n]) for i in range(len(words) - n + 1)}
+
+
+_FORBIDDEN = _runs(NEVER_SPEAK)
+
+
+def reads_as_instructions(answer: str) -> bool:
+    """Whether the answer contains a verbatim run from the instruction half."""
+    return bool(_runs(answer) & _FORBIDDEN)
+
 
 _graph = None
 _graph_key: tuple | None = None
@@ -88,6 +117,11 @@ async def run(message: str, thread_id: str, settings: Settings) -> AsyncIterator
             Command(resume=message) if paused else {"messages": [HumanMessage(content=message)]}
         )
 
+        held: list[str] = []
+        released = False
+        leaked = False
+        spoke = False
+
         async for event in graph.astream_events(graph_input, config):
             kind = event["event"]
             if kind == "on_tool_start":
@@ -98,14 +132,48 @@ async def run(message: str, thread_id: str, settings: Settings) -> AsyncIterator
             elif kind == "on_chat_model_stream":
                 # The deciding turn emits tool-call chunks with no text. Only
                 # the answer has any, so an empty string here is not an error.
-                if text := getattr(event["data"]["chunk"], "text", ""):
+                if not (text := getattr(event["data"]["chunk"], "text", "")) or leaked:
+                    continue
+                if released:
+                    spoke = True
                     yield TokenEvent(text=str(text))
+                    continue
+                held.append(str(text))
+                if sum(len(part) for part in held) < LEAK_GUARD_CHARS:
+                    continue
+                opening = "".join(held)
+                held.clear()
+                if reads_as_instructions(opening):
+                    leaked = True
+                    log.error("suppressed an answer echoing the prompt on thread %s", thread_id)
+                    opening = TANGLED
+                else:
+                    released = True
+                spoke = True
+                yield TokenEvent(text=opening)
 
+        # An answer shorter than the guard is still held here, unreleased.
+        if held and not leaked:
+            opening = "".join(held)
+            if reads_as_instructions(opening):
+                log.error("suppressed an answer echoing the prompt on thread %s", thread_id)
+                opening = TANGLED
+            spoke = True
+            yield TokenEvent(text=opening)
+
+        asked = False
         if remembers:
             for pending in (await graph.aget_state(config)).interrupts:
+                asked = True
                 yield QuestionEvent(
                     text=pending.value["question"], options=pending.value["options"]
                 )
+
+        # A turn that produced no text used to end on `done` alone, and the
+        # widget rendered an empty row that looked like kitty ignoring you. A
+        # clarification legitimately has no answer text; nothing else does.
+        if not spoke and not asked:
+            yield TokenEvent(text=EMPTY)
     except Exception as error:  # noqa: BLE001
         # A public endpoint must never show a visitor a traceback, and the
         # napping fallback is for a missing key, not for a failure mid answer.
