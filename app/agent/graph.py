@@ -5,7 +5,7 @@ this project is the loop itself: the model decides, the tool node executes, the
 result goes back, and it either loops or answers.
 """
 
-from langchain_core.messages import SystemMessage
+from langchain_core.messages import SystemMessage, trim_messages
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.graph import END, START, StateGraph
 from langgraph.prebuilt import ToolNode
@@ -20,6 +20,19 @@ from app.content import site
 # use before the graph stops itself. The endpoint is public and pays per step;
 # without a ceiling a model looping on a failing tool bills until it gives up.
 RECURSION_LIMIT = 10
+
+# Messages, not tokens: token_counter is len below. About nine exchanges.
+#
+# The window is not really about the context limit, it is about the model
+# copying itself. Everything kitty has ever said comes back as part of the next
+# prompt, so a phrase used twice reads as an established pattern and it starts
+# answering from its own transcript instead of the prompt. Forty turns of that
+# is how a dry line becomes a tic.
+#
+# Do not tune this down much. start_on runs after the trim, so a window that
+# lands inside a tool exchange drops the whole exchange with it; at 4 a real
+# thread came back with a single message.
+HISTORY_MESSAGES = 24
 
 
 def should_continue(state: AgentState) -> str:
@@ -50,9 +63,20 @@ def build_graph(settings: Settings, checkpointer=None):
     system_prompt = build_system_prompt(site())
 
     async def agent(state: AgentState) -> dict:
+        # trim_messages selects from the list, it does not rebuild it, so the
+        # thought signatures state.py warns about survive. start_on keeps the
+        # window opening on a visitor turn, so a ToolMessage is never stranded
+        # from the call it answers.
+        recent = trim_messages(
+            state["messages"],
+            max_tokens=HISTORY_MESSAGES,
+            token_counter=len,
+            strategy="last",
+            start_on="human",
+        )
         # Prepended per call rather than stored in state. Kept in state it would
         # be written into every checkpoint and prepended again on resume.
-        messages = [SystemMessage(content=system_prompt), *state["messages"]]
+        messages = [SystemMessage(content=system_prompt), *recent]
         return {"messages": [await llm.ainvoke(messages)]}
 
     builder = StateGraph(AgentState)
