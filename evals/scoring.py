@@ -1,8 +1,35 @@
 """Mechanical routing scores and aggregate reporting."""
 
+import re
 from collections import Counter
 
+from app.content import content, pages, site
 from evals.models import CategorySummary, EvalCase, EvalResult, EvalSummary, TokenUsage
+
+# A path in an answer, whether it came out as markdown or bare.
+_PATH = re.compile(r"\]\((/[^\s)]*)\)|(?<![\w/([])(/[a-z0-9][a-z0-9/-]*)")
+
+
+def known_routes() -> set[str]:
+    routes = {"/"} | {page["route"] for page in pages()}
+    routes |= {
+        project["links"]["live"] for project in content()["projects"] if "live" in project["links"]
+    }
+    routes |= {value for value in site()["links"].values() if value.startswith("/")}
+    return routes
+
+
+def invented_links(answer: str) -> list[str]:
+    """Site paths in an answer that are not real routes.
+
+    A judge cannot check this and kept passing it. The widget renders a path as
+    a working link, so a guessed one is a visitor clicking into a dead page.
+    """
+    known = known_routes()
+    found = {match[0] or match[1] for match in _PATH.findall(answer)}
+    return sorted(
+        path for path in found if path and path.rstrip("/") not in {r.rstrip("/") for r in known}
+    )
 
 
 def route_passes(case: EvalCase, actual_tools: list[str]) -> bool:

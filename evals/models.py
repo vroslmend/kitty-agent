@@ -15,6 +15,13 @@ class EvalCase(BaseModel):
     notes: str = ""
 
 
+class Exchange(BaseModel):
+    """One earlier turn, kept so a repeated phrasing has something to repeat."""
+
+    visitor: str
+    kitty: str
+
+
 class TokenUsage(BaseModel):
     input_tokens: int = 0
     output_tokens: int = 0
@@ -44,12 +51,14 @@ class EvalResult(BaseModel):
     repetition: int = 1
     category: str
     question: str
+    earlier_turns: list[Exchange] = Field(default_factory=list)
     expected_tools: list[str]
     actual_tools: list[str] = Field(default_factory=list)
     tool_calls: list[ToolCall] = Field(default_factory=list)
     allow_extra_tools: bool
     route_passed: bool | None = None
     answer: str = ""
+    invented_links: list[str] = Field(default_factory=list)
     clarification: Clarification | None = None
     latency_ms: int = 0
     agent_usage: TokenUsage = Field(default_factory=TokenUsage)

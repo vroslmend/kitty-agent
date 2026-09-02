@@ -97,7 +97,7 @@ Re-run it when the portfolio's projects or writing change.
 
 ## Evals
 
-`evals/dataset.jsonl` contains 54 golden questions covering tool-free answers,
+`evals/dataset.jsonl` contains 58 golden questions covering tool-free answers,
 routing near misses, clarification, prompt injection, unsupported claims,
 upstream failure, voice, and multi-turn conversation.
 
