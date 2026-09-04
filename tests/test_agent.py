@@ -8,9 +8,11 @@ model picks the right tool, is what the eval harness is for.
 from langchain_core.messages import AIMessage, HumanMessage
 from langgraph.graph import END
 
+import app.agent.graph as graph_module
 from app.agent.graph import build_graph, should_continue
 from app.agent.prompts import build_system_prompt
 from app.config import Settings
+from tests.fakes import ScriptedModel
 
 FAKE_KEY = "not-a-real-key-nothing-here-calls-the-api"
 
@@ -48,6 +50,21 @@ def test_graph_loops_from_tools_back_to_agent() -> None:
     # goes missing the graph still compiles and still answers, just never twice.
     edges = {(e.source, e.target) for e in build_graph(settings_with_key()).get_graph().edges}
     assert ("tools", "agent") in edges
+
+
+def test_model_calls_fail_fast_instead_of_hiding_quota_backoff(monkeypatch) -> None:
+    captured = {}
+
+    def model(**kwargs):
+        captured.update(kwargs)
+        return ScriptedModel(AIMessage(content="hello"))
+
+    monkeypatch.setattr(graph_module, "ChatGoogleGenerativeAI", model)
+
+    build_graph(settings_with_key())
+
+    assert captured["max_retries"] == 1
+    assert captured["timeout"] == 10
 
 
 def test_system_prompt_includes_only_the_public_profile_facts() -> None:

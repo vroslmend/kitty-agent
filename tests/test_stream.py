@@ -11,7 +11,7 @@ from langgraph.checkpoint.memory import InMemorySaver
 
 import app.agent.graph as graph_module
 import app.agent.stream as stream_module
-from app.agent.stream import BROKEN, BUSY, run
+from app.agent.stream import BROKEN, BUSY, EMPTY, run
 from app.config import Settings
 from tests.fakes import FailingModel, ResourceExhausted, ScriptedModel, clarification_call
 
@@ -110,6 +110,35 @@ async def test_a_normal_tool_still_gets_its_chip(scripted) -> None:
     assert [e for e in events if e["type"] == "step"] == [
         {"type": "step", "label": "looking through the projects"}
     ]
+
+
+async def test_a_new_normal_thread_never_reads_saved_state(scripted, monkeypatch) -> None:
+    scripted(ScriptedModel(AIMessage(content="hello")))
+    graph = await stream_module.get_graph(settings())
+
+    class GraphWithoutStateReads:
+        def astream_events(self, *args, **kwargs):
+            return graph.astream_events(*args, **kwargs)
+
+        async def aget_state(self, config):
+            raise AssertionError("a new normal turn should not read saved state")
+
+    async def get_graph(config):
+        return GraphWithoutStateReads()
+
+    monkeypatch.setattr(stream_module, "get_graph", get_graph)
+
+    events = [
+        event.model_dump()
+        async for event in run(
+            "hello",
+            "new-thread",
+            settings(),
+            check_for_resume=False,
+        )
+    ]
+
+    assert events == [{"type": "token", "text": EMPTY}]
 
 
 async def test_the_providers_rate_limit_reads_as_busy(scripted) -> None:

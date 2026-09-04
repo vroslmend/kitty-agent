@@ -1,6 +1,8 @@
 """FastAPI entrypoint."""
 
 import asyncio
+import logging
+import time
 import uuid
 from collections.abc import AsyncIterator
 
@@ -38,10 +40,7 @@ app.add_middleware(
 )
 
 NAPPING = "kitty's napping right now. try again in a bit."
-
-# asyncio keeps only a weak reference to a running task, so a loose one can be
-# collected mid-flight. Holding it here is what keeps the wake alive.
-waking: set[asyncio.Task] = set()
+log = logging.getLogger(__name__)
 
 
 def sse(event: BaseModel) -> str:
@@ -65,12 +64,11 @@ async def wake_database() -> None:
 async def health() -> HealthResponse:
     # The portfolio pings this on page load. Vercel and Neon both scale to zero
     # and their cold starts stack, so waking the instance alone leaves half the
-    # wait in place. Fired loose rather than awaited: starting it is the point,
-    # and the platform's own probes should not pay for Neon.
+    # wait in place. Await the touch so a serverless invocation cannot finish
+    # before Neon is ready; the portfolio fires this request without awaiting
+    # it, so the visitor can keep reading while the warm-up completes.
     if settings.database_url:
-        task = asyncio.create_task(wake_database())
-        waking.add(task)
-        task.add_done_callback(waking.discard)
+        await wake_database()
 
     return HealthResponse(
         service=settings.app_name,
@@ -86,8 +84,15 @@ async def napping_stream(thread_id: str) -> AsyncIterator[str]:
     yield sse(DoneEvent(thread_id=thread_id))
 
 
-async def agent_stream(message: str, thread_id: str) -> AsyncIterator[str]:
-    async for event in agent_run(message, thread_id, settings):
+async def agent_stream(
+    message: str, thread_id: str, *, check_for_resume: bool
+) -> AsyncIterator[str]:
+    async for event in agent_run(
+        message,
+        thread_id,
+        settings,
+        check_for_resume=check_for_resume,
+    ):
         yield sse(event)
     yield sse(DoneEvent(thread_id=thread_id))
 
@@ -104,19 +109,26 @@ async def chat(body: ChatRequest, request: Request) -> StreamingResponse | JSONR
     /health is deliberately not limited, or the platform's own probes would
     consume the allowance.
     """
-    if not await limiter.allow(client_key(request)):
+    admission_started = time.perf_counter()
+    allowed = await limiter.allow(client_key(request))
+    admission_ms = round((time.perf_counter() - admission_started) * 1000)
+    log.info("chat admission allowed=%s duration_ms=%s", allowed, admission_ms)
+    if not allowed:
         return JSONResponse(
             status_code=429,
             content={"type": "error", "message": "too many requests. slow down."},
             headers={"Retry-After": "60"},
         )
 
+    check_for_resume = body.thread_id is not None
     thread_id = body.thread_id or str(uuid.uuid4())
     # An empty key is a supported state, not a misconfiguration, so this falls
     # back rather than failing. It is what keeps a half configured deploy from
     # being what a visitor meets.
     stream = (
-        agent_stream(body.message, thread_id) if settings.agent_ready else napping_stream(thread_id)
+        agent_stream(body.message, thread_id, check_for_resume=check_for_resume)
+        if settings.agent_ready
+        else napping_stream(thread_id)
     )
 
     return StreamingResponse(

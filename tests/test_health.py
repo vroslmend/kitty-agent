@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 
 from app import main
 from app.main import NAPPING, app
+from app.models import TokenEvent
 
 client = TestClient(app)
 
@@ -26,10 +27,6 @@ def test_health_reports_agent_not_ready_without_a_key():
     assert client.get("/health").json()["agent_ready"] is False
 
 
-async def _noop() -> None:
-    pass
-
-
 def test_health_leaves_the_database_alone_when_there_is_none(monkeypatch):
     def explode():
         raise AssertionError("nothing to wake without DATABASE_URL")
@@ -40,18 +37,35 @@ def test_health_leaves_the_database_alone_when_there_is_none(monkeypatch):
 
 
 def test_health_wakes_the_database_when_configured(monkeypatch):
-    # Called synchronously by the handler, so this does not race the loose task.
     called = []
 
-    def wake():
+    async def wake():
         called.append(True)
-        return _noop()
 
     monkeypatch.setattr(main.settings, "database_url", "postgres://pinned")
     monkeypatch.setattr(main, "wake_database", wake)
 
     assert client.get("/health").status_code == 200
     assert called
+
+
+def test_new_chat_skips_the_resume_lookup(monkeypatch):
+    checks = []
+
+    async def allow(key):
+        return True
+
+    async def fake_run(message, thread_id, settings, *, check_for_resume):
+        checks.append(check_for_resume)
+        yield TokenEvent(text="hello")
+
+    monkeypatch.setattr(main.settings, "llm_api_key", "not-a-real-key")
+    monkeypatch.setattr(main.limiter, "allow", allow)
+    monkeypatch.setattr(main, "agent_run", fake_run)
+
+    assert client.post("/chat", json={"message": "hi"}).status_code == 200
+    assert client.post("/chat", json={"message": "hi", "thread_id": "existing"}).status_code == 200
+    assert checks == [False, True]
 
 
 def test_waking_the_database_swallows_an_unreachable_one(monkeypatch):
