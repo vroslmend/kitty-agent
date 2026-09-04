@@ -21,6 +21,13 @@ from app.content import site
 # without a ceiling a model looping on a failing tool bills until it gives up.
 RECURSION_LIMIT = 10
 
+# The Google client otherwise retries quota errors six times with exponential
+# backoff. On the public widget that turns a useful "busy" response into a
+# 20-40 second apparent hang. One attempt lets stream.py surface the provider's
+# 429 immediately, and the timeout bounds a genuinely stuck model request.
+MODEL_MAX_ATTEMPTS = 1
+MODEL_TIMEOUT_SECONDS = 10
+
 # Messages, not tokens: token_counter is len below. About nine exchanges.
 #
 # The window is not really about the context limit, it is about the model
@@ -59,6 +66,8 @@ def build_graph(settings: Settings, checkpointer=None):
         model=settings.llm_model,
         google_api_key=settings.llm_api_key,
         max_output_tokens=settings.max_tokens_per_request,
+        max_retries=MODEL_MAX_ATTEMPTS,
+        timeout=MODEL_TIMEOUT_SECONDS,
     ).bind_tools(tools)
     system_prompt = build_system_prompt(site())
 

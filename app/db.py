@@ -35,6 +35,7 @@ CONNECTION_KWARGS = {
 }
 
 _pool: AsyncConnectionPool | None = None
+_pool_lock = asyncio.Lock()
 
 
 def use_selector_loop_on_windows() -> None:
@@ -53,18 +54,28 @@ async def get_pool() -> AsyncConnectionPool:
     per question. Opening it at import would put that cost on /health too.
     """
     global _pool
-    if _pool is None:
+    if _pool is not None:
+        return _pool
+
+    # /health and /chat can arrive together while an instance is cold. Publish
+    # the pool only after it has opened, so the second request waits for the
+    # same initialization instead of receiving a half-open pool or creating a
+    # second one.
+    async with _pool_lock:
+        if _pool is not None:
+            return _pool
         settings = get_settings()
         if not settings.database_url:
             raise RuntimeError("DATABASE_URL is empty, so there is no pool to open")
-        _pool = AsyncConnectionPool(
+        pool = AsyncConnectionPool(
             settings.database_url,
             min_size=0,
             max_size=4,
             kwargs=CONNECTION_KWARGS,
             open=False,
         )
-        await _pool.open(wait=True, timeout=15)
+        await pool.open(wait=True, timeout=15)
+        _pool = pool
     return _pool
 
 

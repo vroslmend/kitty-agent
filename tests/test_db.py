@@ -5,8 +5,11 @@ anyway: all three look like boilerplate, all three are load bearing, and each
 one fails in a way that points somewhere other than the cause.
 """
 
+import asyncio
+
 import pytest
 
+import app.db as db_module
 from app.agent.graph import build_graph
 from app.config import Settings
 from app.db import CONNECTION_KWARGS, get_pool
@@ -38,6 +41,30 @@ def test_rows_come_back_as_dicts() -> None:
 async def test_pool_refuses_to_open_without_a_url() -> None:
     with pytest.raises(RuntimeError, match="DATABASE_URL"):
         await get_pool()
+
+
+async def test_concurrent_cold_requests_share_one_pool_open(monkeypatch) -> None:
+    created = []
+
+    class FakePool:
+        def __init__(self, *args, **kwargs):
+            created.append(self)
+
+        async def open(self, **kwargs):
+            await asyncio.sleep(0)
+
+    monkeypatch.setattr(db_module, "_pool", None)
+    monkeypatch.setattr(
+        db_module,
+        "get_settings",
+        lambda: Settings(database_url="postgresql://nowhere/nothing"),
+    )
+    monkeypatch.setattr(db_module, "AsyncConnectionPool", FakePool)
+
+    first, second = await asyncio.gather(db_module.get_pool(), db_module.get_pool())
+
+    assert first is second
+    assert created == [first]
 
 
 def test_graph_compiles_without_a_checkpointer() -> None:
