@@ -5,11 +5,12 @@ this project is the loop itself: the model decides, the tool node executes, the
 result goes back, and it either loops or answers.
 """
 
-from langchain_core.messages import SystemMessage, trim_messages
+from langchain_core.messages import AIMessage, SystemMessage, trim_messages
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.graph import END, START, StateGraph
 from langgraph.prebuilt import ToolNode
 
+from app.agent.acknowledgements import EVENT_MARKER, acknowledgement_reply
 from app.agent.prompts import build_system_prompt
 from app.agent.state import AgentState
 from app.agent.tools import TOOLS, ask_clarification
@@ -71,6 +72,13 @@ def build_graph(settings: Settings, checkpointer=None):
     ).bind_tools(tools)
 
     async def agent(state: AgentState) -> dict:
+        if reply := acknowledgement_reply(state["messages"]):
+            return {
+                "messages": [
+                    AIMessage(content=reply, additional_kwargs={"kitty_event": EVENT_MARKER})
+                ]
+            }
+
         # trim_messages selects from the list, it does not rebuild it, so the
         # thought signatures state.py warns about survive. start_on keeps the
         # window opening on a visitor turn, so a ToolMessage is never stranded

@@ -15,6 +15,7 @@ from langchain_core.messages import HumanMessage
 from langgraph.types import Command
 from pydantic import BaseModel
 
+from app.agent.acknowledgements import EVENT_MARKER
 from app.agent.graph import RECURSION_LIMIT, build_graph
 from app.agent.prompts import NEVER_SPEAK
 from app.config import Settings
@@ -169,6 +170,7 @@ async def run(
         released = False
         leaked = False
         spoke = False
+        direct_answer = ""
         clarification_started = False
 
         async for event in graph.astream_events(graph_input, config):
@@ -180,6 +182,13 @@ async def run(
             if kind == "on_chat_model_end":
                 if model_start := model_started.pop(run_id, None):
                     model_ms.append(elapsed_ms(model_start))
+                continue
+            if kind == "on_chain_end" and event.get("name") == "agent":
+                output = event.get("data", {}).get("output")
+                messages = output.get("messages", []) if isinstance(output, dict) else []
+                answer = messages[-1] if messages else None
+                if getattr(answer, "additional_kwargs", {}).get("kitty_event") == EVENT_MARKER:
+                    direct_answer = str(answer.text)
                 continue
             if kind == "on_tool_start":
                 name = event["name"]
@@ -220,8 +229,12 @@ async def run(
                 mark_event(token=True)
                 yield TokenEvent(text=opening)
 
+        if direct_answer:
+            spoke = True
+            mark_event(token=True)
+            yield TokenEvent(text=direct_answer)
         # An answer shorter than the guard is still held here, unreleased.
-        if held and not leaked:
+        elif held and not leaked:
             opening = "".join(held)
             if reads_as_instructions(opening):
                 log.error("suppressed an answer echoing the prompt on thread %s", thread_id)

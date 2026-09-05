@@ -1,11 +1,13 @@
-"""Graph wiring, routing and tool behaviour.
+"""Graph wiring, routing and deterministic turn behaviour.
 
 Nothing here calls the model. CI has no API key, and a suite that needs one is a
 suite that gets skipped. The one thing that would need a real call, whether the
 model picks the right tool, is what the eval harness is for.
 """
 
+import pytest
 from langchain_core.messages import AIMessage, HumanMessage
+from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import END
 
 import app.agent.graph as graph_module
@@ -117,3 +119,64 @@ async def test_graph_ignores_an_unknown_page_path(monkeypatch) -> None:
     system_message = model.seen[0][0]
     assert "Trusted current-page context" not in system_message.content
     assert "/not-real" not in system_message.content
+
+
+@pytest.mark.parametrize(
+    ("message", "answer"),
+    [
+        ("i see", "mhm."),
+        ("Oh, got it now.", "mhm."),
+        ("That makes sense.", "mhm."),
+        ("cool", "glad you think so."),
+        ("very nice.", "glad you think so."),
+        ("thanks", "you're welcome."),
+        ("Thanks, that was helpful.", "you're welcome."),
+    ],
+)
+async def test_pure_acknowledgements_bypass_the_model(
+    monkeypatch, message: str, answer: str
+) -> None:
+    model = ScriptedModel(AIMessage(content="the model should not answer"))
+    monkeypatch.setattr(graph_module, "ChatGoogleGenerativeAI", lambda **kwargs: model)
+    graph = build_graph(settings_with_key())
+
+    state = await graph.ainvoke({"messages": [HumanMessage(content=message)]})
+
+    assert state["messages"][-1].content == answer
+    assert model.seen == []
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "i see a problem",
+        "i see, but why?",
+        "okay, show me the projects",
+        "cool project?",
+        "thanks, what should I read next?",
+    ],
+)
+async def test_mixed_turns_still_reach_the_model(monkeypatch, message: str) -> None:
+    model = ScriptedModel(AIMessage(content="a real answer"))
+    monkeypatch.setattr(graph_module, "ChatGoogleGenerativeAI", lambda **kwargs: model)
+    graph = build_graph(settings_with_key())
+
+    state = await graph.ainvoke({"messages": [HumanMessage(content=message)]})
+
+    assert state["messages"][-1].content == "a real answer"
+    assert len(model.seen) == 1
+
+
+async def test_acknowledgement_replies_do_not_become_a_tic(monkeypatch) -> None:
+    model = ScriptedModel()
+    monkeypatch.setattr(graph_module, "ChatGoogleGenerativeAI", lambda **kwargs: model)
+    graph = build_graph(settings_with_key(), checkpointer=InMemorySaver())
+    config = {"configurable": {"thread_id": "acknowledgements"}}
+
+    answers = []
+    for message in ("i see", "got it", "okay"):
+        state = await graph.ainvoke({"messages": [HumanMessage(content=message)]}, config)
+        answers.append(state["messages"][-1].content)
+
+    assert answers == ["mhm.", "yeah.", "all right."]
+    assert model.seen == []
