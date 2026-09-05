@@ -69,6 +69,23 @@ async def test_the_visitors_reply_resumes_the_paused_tool_call(scripted) -> None
     assert len(model.seen) == 2
 
 
+async def test_an_acknowledgement_can_still_resume_a_paused_tool(scripted) -> None:
+    model = scripted(
+        clarification_call("continue with that one?", ["okay", "not yet"]),
+        AIMessage(content="Here it is."),
+    )
+    graph = build_graph(Settings(llm_api_key=FAKE_KEY), checkpointer=InMemorySaver())
+    await graph.ainvoke({"messages": [HumanMessage(content="the first option")]}, config("t3"))
+
+    await graph.ainvoke(Command(resume="okay"), config("t3"))
+
+    assert len(model.seen) == 2
+    assert model.seen[-1][-1].type == "tool"
+    assert model.seen[-1][-1].content == "okay"
+    state = await graph.aget_state(config("t3"))
+    assert state.values["messages"][-1].content == "Here it is."
+
+
 async def test_without_a_checkpointer_the_clarification_tool_is_not_offered(scripted) -> None:
     # interrupt() needs somewhere to persist the paused run. An empty
     # DATABASE_URL is a supported state, so the tool has to disappear rather

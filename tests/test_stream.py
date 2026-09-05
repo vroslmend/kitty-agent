@@ -125,6 +125,15 @@ async def test_a_known_page_is_added_to_the_system_context(scripted) -> None:
     assert "Trusted current-page context" in system_message.content
 
 
+async def test_a_pure_acknowledgement_streams_without_calling_the_model(scripted) -> None:
+    model = scripted(ScriptedModel(AIMessage(content="the model should not answer")))
+
+    events = await collect("i see", "ack-thread")
+
+    assert events == [{"type": "token", "text": "mhm."}]
+    assert model.seen == []
+
+
 async def test_a_new_normal_thread_never_reads_saved_state(scripted, monkeypatch) -> None:
     scripted(ScriptedModel(AIMessage(content="hello")))
     graph = await stream_module.get_graph(settings())
