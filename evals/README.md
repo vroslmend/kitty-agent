@@ -38,6 +38,7 @@ One JSON object per line.
 | `question` | User input, including intentional casing and typos. |
 | `context` | Earlier visitor turns played on the same thread first. Only `question` is scored. |
 | `category` | Reporting slice, such as `route.*`, `honesty`, or `failure_path`. |
+| `page_path` | Optional portfolio route for current-page cases. It becomes context only when it exists in the baked route map. |
 | `expected_tools` | Required tool calls. An empty list requires no tool call. |
 | `allow_extra_tools` | Whether additional tool calls are permitted. |
 | `must` | Required answer traits for the optional judge. |
