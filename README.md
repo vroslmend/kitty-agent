@@ -5,14 +5,8 @@
 <h3 align="center">kitty</h3>
 
 <p align="center">
-  A small on-site agent for <a href="https://ammarhassan.dev">ammarhassan.dev</a>.<br>
+  A small on-site agent, live on <a href="https://ammarhassan.dev">ammarhassan.dev</a>.<br>
   It answers questions about the work, the writing, the person behind them, and what is happening lately.
-</p>
-
-<p align="center">
-  <a href="https://ammarhassan.dev">try it live</a>
-  ·
-  <a href="https://github.com/vroslmend/kitty-agent/actions/workflows/ci.yml"><img src="https://github.com/vroslmend/kitty-agent/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
 </p>
 
 Kitty is a hand-built LangGraph tool-calling loop behind a FastAPI service. It
@@ -272,6 +266,8 @@ the indexed chunks for each route.
 Do not point routine local work at the production branch.
 
 ## Tests
+
+[![CI](https://github.com/vroslmend/kitty-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/vroslmend/kitty-agent/actions/workflows/ci.yml)
 
 The deterministic suite never calls the model or the network:
 
