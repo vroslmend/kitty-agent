@@ -30,3 +30,28 @@ def pages() -> list[dict]:
 
 def site() -> dict:
     return content()["site"]
+
+
+def profile() -> dict:
+    """Public background facts copied from the portfolio at deploy time."""
+    data = content()
+    return {
+        "site": data["site"],
+        "experience": data["experience"],
+        "education": data["education"],
+        "toolbox": data["toolbox"],
+    }
+
+
+def current_page(path: str | None) -> dict | None:
+    """Return trusted page context only for a route that actually exists."""
+    if not path:
+        return None
+    normalized = "/" + path.strip().strip("/") if path.strip() != "/" else "/"
+    if normalized == "/":
+        return {
+            "route": "/",
+            "title": "home",
+            "description": "Ammar's portfolio home page with selected work and recent writing.",
+        }
+    return next((page for page in pages() if page["route"] == normalized), None)

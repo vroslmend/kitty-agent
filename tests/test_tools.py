@@ -14,6 +14,7 @@ from app.agent.tools import (
     TOOLS,
     get_github_activity,
     get_now_playing,
+    get_profile,
     list_projects,
     suggest_navigation,
 )
@@ -43,6 +44,7 @@ def test_every_tool_has_a_description() -> None:
 def test_list_projects_defaults_to_the_featured_ones() -> None:
     result = list_projects.invoke({})
     assert "CUI Central" in result
+    assert "Work page: /work" in result
     # Not featured, so it must not appear in the unfiltered answer.
     assert "Lead Tracker" not in result
 
@@ -51,6 +53,13 @@ def test_list_projects_filters_on_stack() -> None:
     result = list_projects.invoke({"topics": ["terraform"]})
     assert "Cloud Visitor Counter" in result
     assert "Check!" not in result
+
+
+def test_list_projects_includes_verified_project_evidence() -> None:
+    result = list_projects.invoke({"topics": ["multiplayer"]})
+
+    assert "authoritative XState server" in result
+    assert "redacts hidden cards" in result
 
 
 def test_list_projects_filters_on_year() -> None:
@@ -97,6 +106,30 @@ def test_suggest_navigation_admits_when_it_has_nothing() -> None:
     assert "Nothing on the site matches" in result
 
 
+def test_profile_returns_public_experience() -> None:
+    result = get_profile.invoke({"sections": ["experience"]})
+
+    assert "Punjab Safe Cities Authority" in result
+    assert "Web Development Intern" in result
+
+
+def test_profile_returns_education_and_skills() -> None:
+    result = get_profile.invoke({"sections": ["education", "skills"]})
+
+    assert "BS Software Engineering" in result
+    assert "COMSATS University" in result
+    assert "Python" in result
+    assert "Terraform" in result
+
+
+def test_profile_returns_only_public_contact_details() -> None:
+    result = get_profile.invoke({"sections": ["availability", "contact"]})
+
+    assert "open to work" in result
+    assert "ammarhassan.amr@gmail.com" in result
+    assert "github.com/vroslmend" in result
+
+
 @pytest.mark.parametrize(
     ("payload", "expected"),
     [
@@ -135,10 +168,13 @@ async def test_github_activity_reports_rate_limiting(monkeypatch) -> None:
     # Unauthenticated GitHub is 60 requests an hour shared across every visitor,
     # so this is the failure most likely to actually happen in production.
     mock_transport(monkeypatch, lambda request: httpx.Response(403, json={}))
-    assert "rate limiting" in await get_github_activity.ainvoke({})
+    result = await get_github_activity.ainvoke({})
+    assert "rate limiting" in result
+    assert "/work" in result
 
 
 async def test_github_activity_reports_an_outage(monkeypatch) -> None:
     mock_transport(monkeypatch, lambda request: httpx.Response(500, json={}))
     result = await get_github_activity.ainvoke({})
     assert "not responding" in result
+    assert "/work" in result

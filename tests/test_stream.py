@@ -47,8 +47,11 @@ def scripted(monkeypatch):
     return install
 
 
-async def collect(message: str, thread_id: str) -> list[dict]:
-    return [event.model_dump() async for event in run(message, thread_id, settings())]
+async def collect(message: str, thread_id: str, page_path: str | None = None) -> list[dict]:
+    return [
+        event.model_dump()
+        async for event in run(message, thread_id, settings(), page_path=page_path)
+    ]
 
 
 async def test_a_pause_becomes_a_question_event(scripted) -> None:
@@ -110,6 +113,16 @@ async def test_a_normal_tool_still_gets_its_chip(scripted) -> None:
     assert [e for e in events if e["type"] == "step"] == [
         {"type": "step", "label": "looking through the projects"}
     ]
+
+
+async def test_a_known_page_is_added_to_the_system_context(scripted) -> None:
+    model = scripted(ScriptedModel(AIMessage(content="the current essay")))
+
+    await collect("what is this essay?", "page-thread", "/writing/visitor-counter")
+
+    system_message = model.seen[0][0]
+    assert "/writing/visitor-counter" in system_message.content
+    assert "Trusted current-page context" in system_message.content
 
 
 async def test_a_new_normal_thread_never_reads_saved_state(scripted, monkeypatch) -> None:

@@ -85,13 +85,18 @@ async def napping_stream(thread_id: str) -> AsyncIterator[str]:
 
 
 async def agent_stream(
-    message: str, thread_id: str, *, check_for_resume: bool
+    message: str,
+    thread_id: str,
+    *,
+    check_for_resume: bool,
+    page_path: str | None = None,
 ) -> AsyncIterator[str]:
     async for event in agent_run(
         message,
         thread_id,
         settings,
         check_for_resume=check_for_resume,
+        page_path=page_path,
     ):
         yield sse(event)
     yield sse(DoneEvent(thread_id=thread_id))
@@ -126,7 +131,12 @@ async def chat(body: ChatRequest, request: Request) -> StreamingResponse | JSONR
     # back rather than failing. It is what keeps a half configured deploy from
     # being what a visitor meets.
     stream = (
-        agent_stream(body.message, thread_id, check_for_resume=check_for_resume)
+        agent_stream(
+            body.message,
+            thread_id,
+            check_for_resume=check_for_resume,
+            page_path=body.page_path,
+        )
         if settings.agent_ready
         else napping_stream(thread_id)
     )

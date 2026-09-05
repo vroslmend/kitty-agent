@@ -45,6 +45,8 @@ class AnswerJudge:
             "must": case.must,
             "must_not": case.must_not,
         }
+        if case.page_path:
+            payload["page_path"] = case.page_path
         if earlier_turns:
             payload["conversation_so_far"] = [
                 {"visitor": turn.visitor, "kitty": turn.kitty} for turn in earlier_turns
