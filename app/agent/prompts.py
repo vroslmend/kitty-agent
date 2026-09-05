@@ -76,16 +76,21 @@ limit plainly and never substitute the current track for a historical answer.
 
 Grounding rules, in order of importance:
 
-1. Use your tools to answer questions about his projects, writing, music and \
-recent activity. Do not answer from memory when a tool covers the question.
+1. Use your tools to answer questions about his projects, writing, background, \
+music and recent activity. Do not answer from memory when a tool covers the \
+question.
 2. If a tool returns nothing, or fails, say so plainly and offer the next best \
 thing. A tool being unavailable is a normal thing to report, not an error to \
 hide or apologise for at length.
 3. Never invent a project, an essay, a date, a number, a contact detail, a \
-price or a link. Site paths come from suggest_navigation, never from memory: a \
-path you guessed is a link the visitor clicks into a dead page. If you do not \
-have something, say you do not have it. For an unpublished personal detail or \
-price, offer his public email when that would help the visitor.
+price or a link. Site paths come from tool output or the trusted current-page \
+context, never from memory. Project detail routes do not exist, so never turn a \
+project name or slug into a /projects/... path. Do not add a link merely because \
+one is available. When a visitor asks to see, find or read something and a tool \
+provides a relevant URL or path, include one useful markdown link. Do not dump \
+links. If you do not have something, say you do not \
+have it. For an unpublished personal detail or price, offer his public email \
+when that would help the visitor.
 4. Never put a question to the visitor in your own words. When a lookup comes \
 back holding several things they could have meant, and their wording does not \
 choose between them, call ask_clarification with those names. That tool is the \
@@ -133,7 +138,7 @@ small panel, not an article.\
 NEVER_SPEAK = SYSTEM_PROMPT.split("Grounding rules, in order of importance:", 1)[1]
 
 
-def build_system_prompt(profile: dict) -> str:
+def build_system_prompt(profile: dict, current_page: dict | None = None) -> str:
     """Add the small public profile the agent needs but no lookup tool owns."""
     facts = [
         f"name: {profile['name']}",
@@ -142,4 +147,14 @@ def build_system_prompt(profile: dict) -> str:
         f"public email: {profile['email']}",
         f"current status: {profile['now']}",
     ]
-    return SYSTEM_PROMPT + "\n\nPublic site facts:\n" + "\n".join(f"- {fact}" for fact in facts)
+    prompt = SYSTEM_PROMPT + "\n\nPublic site facts:\n" + "\n".join(f"- {fact}" for fact in facts)
+    if current_page:
+        prompt += (
+            "\n\nTrusted current-page context:\n"
+            f"- route: {current_page['route']}\n"
+            f"- title: {current_page['title']}\n"
+            f"- description: {current_page['description']}\n"
+            "Use this only to resolve references such as 'this page' or 'this essay'. "
+            "For claims about an essay, still search the writing before answering."
+        )
+    return prompt

@@ -113,14 +113,24 @@ async def evaluate_case(graph, case: EvalCase, repetition: int = 1) -> EvalResul
         # Its own replies are kept: a tic is only visible against them, and the
         # judge cannot see a repetition it was never shown.
         for earlier in case.context:
-            state = await graph.ainvoke({"messages": [HumanMessage(content=earlier)]}, config)
+            state = await graph.ainvoke(
+                {
+                    "messages": [HumanMessage(content=earlier)],
+                    "page_path": case.page_path,
+                },
+                config,
+            )
             reply = state["messages"][-1]
             earlier_turns.append(
                 Exchange(visitor=earlier, kitty=str(getattr(reply, "text", "") or ""))
             )
 
         async for event in graph.astream_events(
-            {"messages": [HumanMessage(content=case.question)]}, config
+            {
+                "messages": [HumanMessage(content=case.question)],
+                "page_path": case.page_path,
+            },
+            config,
         ):
             kind = event["event"]
             if kind == "on_tool_start":
@@ -151,6 +161,7 @@ async def evaluate_case(graph, case: EvalCase, repetition: int = 1) -> EvalResul
         repetition=repetition,
         category=case.category,
         question=case.question,
+        page_path=case.page_path,
         earlier_turns=earlier_turns,
         expected_tools=case.expected_tools,
         actual_tools=actual_tools,

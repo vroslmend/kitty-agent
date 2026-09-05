@@ -27,6 +27,7 @@ def result(eval_case: EvalCase, **updates) -> EvalResult:
         "id": eval_case.id,
         "category": eval_case.category,
         "question": eval_case.question,
+        "page_path": eval_case.page_path,
         "expected_tools": eval_case.expected_tools,
         "actual_tools": eval_case.expected_tools,
         "allow_extra_tools": eval_case.allow_extra_tools,
@@ -114,12 +115,16 @@ async def test_evaluate_case_captures_tools_text_usage_and_question() -> None:
     ]
     interrupt = SimpleNamespace(value={"question": "Which project?", "options": ["One", "Two"]})
 
-    evaluated = await evaluate_case(FakeGraph(events, [interrupt]), case())
+    graph = FakeGraph(events, [interrupt])
+    evaluated = await evaluate_case(graph, case(page_path="/work"))
 
     assert evaluated.actual_tools == ["list_projects"]
+    assert evaluated.page_path == "/work"
+    assert graph.graph_input["page_path"] == "/work"
+    assert evaluated.question == "what has he built?"
+    assert evaluated.route_passed is True
     assert evaluated.tool_calls[0].input == {"topics": ["python"]}
     assert evaluated.answer == "Choose one."
-    assert evaluated.route_passed is True
     assert evaluated.agent_usage.total_tokens == 13
     assert evaluated.clarification is not None
     assert evaluated.clarification.options == ["One", "Two"]

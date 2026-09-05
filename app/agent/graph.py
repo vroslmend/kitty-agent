@@ -14,7 +14,7 @@ from app.agent.prompts import build_system_prompt
 from app.agent.state import AgentState
 from app.agent.tools import TOOLS, ask_clarification
 from app.config import Settings
-from app.content import site
+from app.content import current_page, site
 
 # A call and its result are two steps, so this is roughly four rounds of tool
 # use before the graph stops itself. The endpoint is public and pays per step;
@@ -69,7 +69,6 @@ def build_graph(settings: Settings, checkpointer=None):
         max_retries=MODEL_MAX_ATTEMPTS,
         timeout=MODEL_TIMEOUT_SECONDS,
     ).bind_tools(tools)
-    system_prompt = build_system_prompt(site())
 
     async def agent(state: AgentState) -> dict:
         # trim_messages selects from the list, it does not rebuild it, so the
@@ -85,6 +84,7 @@ def build_graph(settings: Settings, checkpointer=None):
         )
         # Prepended per call rather than stored in state. Kept in state it would
         # be written into every checkpoint and prepended again on resume.
+        system_prompt = build_system_prompt(site(), current_page(state.get("page_path")))
         messages = [SystemMessage(content=system_prompt), *recent]
         return {"messages": [await llm.ainvoke(messages)]}
 

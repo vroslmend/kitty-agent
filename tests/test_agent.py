@@ -82,3 +82,38 @@ def test_system_prompt_includes_only_the_public_profile_facts() -> None:
     assert "public@example.com" in prompt
     assert "open to work" in prompt
     assert "must not appear" not in prompt
+
+
+def test_system_prompt_includes_validated_current_page_context() -> None:
+    prompt = build_system_prompt(
+        {
+            "name": "Ammar Hassan",
+            "role": "software engineer",
+            "location": "lahore, pakistan",
+            "email": "public@example.com",
+            "now": "open to work",
+        },
+        {
+            "route": "/writing/visitor-counter",
+            "title": "counting visitors",
+            "description": "How the visitor counter was built.",
+        },
+    )
+
+    assert "Trusted current-page context" in prompt
+    assert "/writing/visitor-counter" in prompt
+    assert "still search the writing" in prompt
+
+
+async def test_graph_ignores_an_unknown_page_path(monkeypatch) -> None:
+    model = ScriptedModel(AIMessage(content="hello"))
+    monkeypatch.setattr(graph_module, "ChatGoogleGenerativeAI", lambda **kwargs: model)
+    graph = build_graph(settings_with_key())
+
+    await graph.ainvoke(
+        {"messages": [HumanMessage(content="what is this?")], "page_path": "/not-real"}
+    )
+
+    system_message = model.seen[0][0]
+    assert "Trusted current-page context" not in system_message.content
+    assert "/not-real" not in system_message.content

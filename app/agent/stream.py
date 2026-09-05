@@ -29,6 +29,7 @@ STEP_LABELS = {
     "suggest_navigation": "finding the page",
     "get_now_playing": "checking spotify",
     "get_github_activity": "checking github",
+    "get_profile": "checking his background",
 }
 
 # The question this one asks is the output the visitor sees. A chip announcing
@@ -105,6 +106,7 @@ async def run(
     settings: Settings,
     *,
     check_for_resume: bool = True,
+    page_path: str | None = None,
 ) -> AsyncIterator[BaseModel]:
     started = time.perf_counter()
     timing: dict[str, object] = {
@@ -155,7 +157,12 @@ async def run(
         if remembers and check_for_resume:
             timing["resume_lookup_ms"] = elapsed_ms(resume_started)
         graph_input = (
-            Command(resume=message) if paused else {"messages": [HumanMessage(content=message)]}
+            Command(resume=message)
+            if paused
+            else {
+                "messages": [HumanMessage(content=message)],
+                "page_path": page_path,
+            }
         )
 
         held: list[str] = []

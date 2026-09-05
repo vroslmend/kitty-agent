@@ -51,21 +51,24 @@ def test_health_wakes_the_database_when_configured(monkeypatch):
 
 def test_new_chat_skips_the_resume_lookup(monkeypatch):
     checks = []
+    paths = []
 
     async def allow(key):
         return True
 
-    async def fake_run(message, thread_id, settings, *, check_for_resume):
+    async def fake_run(message, thread_id, settings, *, check_for_resume, page_path):
         checks.append(check_for_resume)
+        paths.append(page_path)
         yield TokenEvent(text="hello")
 
     monkeypatch.setattr(main.settings, "llm_api_key", "not-a-real-key")
     monkeypatch.setattr(main.limiter, "allow", allow)
     monkeypatch.setattr(main, "agent_run", fake_run)
 
-    assert client.post("/chat", json={"message": "hi"}).status_code == 200
+    assert client.post("/chat", json={"message": "hi", "page_path": "/work"}).status_code == 200
     assert client.post("/chat", json={"message": "hi", "thread_id": "existing"}).status_code == 200
     assert checks == [False, True]
+    assert paths == ["/work", None]
 
 
 def test_waking_the_database_swallows_an_unreachable_one(monkeypatch):

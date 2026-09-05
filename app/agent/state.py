@@ -1,6 +1,6 @@
 """What the graph carries between nodes."""
 
-from typing import Annotated, TypedDict
+from typing import Annotated, NotRequired, TypedDict
 
 from langgraph.graph.message import add_messages
 
@@ -13,3 +13,7 @@ class AgentState(TypedDict):
     # drops the signature and breaks tool calling in a way that looks like a
     # model problem. Read from it freely; never reconstruct it.
     messages: Annotated[list, add_messages]
+    # Trusted only after app.content.current_page validates it against the
+    # baked site map. It helps resolve phrases like "this essay" without
+    # turning an arbitrary client string into prompt content.
+    page_path: NotRequired[str | None]

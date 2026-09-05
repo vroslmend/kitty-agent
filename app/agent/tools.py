@@ -18,7 +18,7 @@ from langchain_core.tools import tool
 from langgraph.types import interrupt
 
 from app.config import get_settings
-from app.content import pages, projects, site
+from app.content import pages, profile, projects, site
 from app.rag.store import search
 
 # Short on purpose. These run inside a serverless invocation with a wall-clock
@@ -64,6 +64,8 @@ def _render(project: dict) -> str:
     ]
     if links:
         lines.append(f"  {links}")
+    for fact in project.get("evidence", []):
+        lines.append(f"  evidence: {fact}")
     return "\n".join(lines)
 
 
@@ -96,7 +98,7 @@ def list_projects(topics: list[str] | None = None) -> str:
     else:
         found = [p for p in all_projects if p["featured"]]
         header = f"His featured projects ({len(all_projects)} in total):"
-    return header + "\n\n" + "\n\n".join(_render(p) for p in found)
+    return header + "\nWork page: /work\n\n" + "\n\n".join(_render(p) for p in found)
 
 
 @tool
@@ -196,11 +198,17 @@ async def get_github_activity(limit: int = 5) -> str:
         async with httpx.AsyncClient(timeout=TIMEOUT) as client:
             response = await client.get(url, params=params, headers=headers)
             if response.status_code in (403, 429):
-                return "GitHub is rate limiting me, so I cannot check his recent activity."
+                return (
+                    "GitHub is rate limiting me, so I cannot check his recent activity. "
+                    "His selected projects are on the work page: /work"
+                )
             response.raise_for_status()
             repos = response.json()
     except httpx.HTTPError:
-        return "GitHub is not responding, so I cannot check his recent activity right now."
+        return (
+            "GitHub is not responding, so I cannot check his recent activity right now. "
+            "His selected projects are on the work page: /work"
+        )
 
     if not repos:
         return "GitHub returned no public repositories."
@@ -213,6 +221,66 @@ async def get_github_activity(limit: int = 5) -> str:
 
 
 @tool
+def get_profile(sections: list[str] | None = None) -> str:
+    """Look up Ammar's public background, experience, education and skills.
+
+    Use this for where he worked, what he studied, technologies he knows, a
+    background summary, whether he is available for work, or how to contact
+    him. Pass one or more of: overview, experience, education, skills,
+    availability, contact. Leave sections out for a concise full overview.
+
+    Use list_projects for evidence of what he has built, search_writing for his
+    views, and get_github_activity for what he has pushed lately.
+    """
+    data = profile()
+    identity = data["site"]
+    requested = [section.lower().strip() for section in sections or ["overview"]]
+    aliases = {"toolbox": "skills", "work": "experience", "study": "education"}
+    requested = [aliases.get(section, section) for section in requested]
+    available = {"overview", "experience", "education", "skills", "availability", "contact"}
+    selected = [section for section in requested if section in available]
+    if not selected:
+        return "Available profile sections: " + ", ".join(sorted(available)) + "."
+
+    blocks: list[str] = []
+    for section in dict.fromkeys(selected):
+        if section == "overview":
+            blocks.append(
+                "overview:\n"
+                f"name: {identity['name']}\n"
+                f"role: {identity['role']}\n"
+                f"location: {identity['location']}\n"
+                f"current status: {identity['now']}"
+            )
+        elif section == "experience":
+            rows = [
+                f"{item['role']} at {item['company']} ({item['period']}) - {item['description']}"
+                for item in data["experience"]
+            ]
+            blocks.append("experience:\n" + "\n".join(rows))
+        elif section == "education":
+            rows = [
+                f"{item['degree']}, {item['school']} ({item['period']})"
+                for item in data["education"]
+            ]
+            blocks.append("education:\n" + "\n".join(rows))
+        elif section == "skills":
+            blocks.append("skills:\n" + ", ".join(data["toolbox"]))
+        elif section == "availability":
+            blocks.append(f"availability:\n{identity['now']}")
+        elif section == "contact":
+            links = identity["links"]
+            blocks.append(
+                "contact:\n"
+                f"email: {identity['email']}\n"
+                f"GitHub: {links['github']}\n"
+                f"LinkedIn: {links['linkedin']}\n"
+                f"resume: {links['resume']}"
+            )
+    return "\n\n".join(blocks)
+
+
+@tool
 async def search_writing(query: str) -> str:
     """Search what Ammar has written in his essays.
 
@@ -222,7 +290,8 @@ async def search_writing(query: str) -> str:
 
     Use list_projects instead for what he built rather than what he wrote about
     it, and suggest_navigation if they only want a link to the writing rather
-    than an answer drawn from it.
+    than an answer drawn from it. Call this once per visitor question: put all
+    useful search terms into one query rather than trying shorter variants.
     """
     if not get_settings().database_url:
         return "The writing index is not configured, so I cannot search the essays."
@@ -261,5 +330,6 @@ TOOLS = [
     suggest_navigation,
     get_now_playing,
     get_github_activity,
+    get_profile,
     ask_clarification,
 ]

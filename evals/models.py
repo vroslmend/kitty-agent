@@ -7,6 +7,7 @@ class EvalCase(BaseModel):
     id: str
     question: str
     category: str
+    page_path: str | None = None
     context: list[str] = Field(default_factory=list)
     expected_tools: list[str] = Field(default_factory=list)
     allow_extra_tools: bool = False
@@ -51,6 +52,7 @@ class EvalResult(BaseModel):
     repetition: int = 1
     category: str
     question: str
+    page_path: str | None = None
     earlier_turns: list[Exchange] = Field(default_factory=list)
     expected_tools: list[str]
     actual_tools: list[str] = Field(default_factory=list)
