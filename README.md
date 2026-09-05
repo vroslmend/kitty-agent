@@ -2,7 +2,7 @@
   <img src="assets/kitty-mark.svg" width="136" alt="kitty, a small line-art cat">
 </p>
 
-<h1 align="center">kitty</h1>
+<h3 align="center">kitty</h3>
 
 <p align="center">
   A small on-site agent for <a href="https://ammarhassan.dev">ammarhassan.dev</a>.<br>
@@ -52,18 +52,18 @@ flowchart LR
 
     subgraph service["kitty-agent · Python on Vercel"]
         api[FastAPI /chat]
-        graph[LangGraph loop]
+        agent_graph[LangGraph loop]
         tools[ToolNode]
-        api --> graph
-        graph -->|tool calls| tools
-        tools -->|results| graph
+        api --> agent_graph
+        agent_graph -->|tool calls| tools
+        tools -->|results| agent_graph
     end
 
     widget -->|"message · thread_id · page_path"| api
     api -.->|"SSE · step · token · question · done"| widget
 
-    graph <--> gemini[Gemini]
-    graph <--> state[(Neon Postgres<br/>checkpoints)]
+    agent_graph <--> gemini[Gemini]
+    agent_graph <--> state[(Neon Postgres<br/>checkpoints)]
     api --> limit[(Postgres<br/>shared rate limit)]
     tools --> content[baked projects<br/>pages · public profile]
     tools --> writing[(pgvector<br/>writing index)]
