@@ -1,42 +1,18 @@
 <p align="center">
-  <img src="assets/kitty-mark.svg" width="136" alt="kitty, a small line-art cat">
+  <img src="assets/kitty-mark.svg" width="144" alt="kitty, a small line-art cat">
 </p>
 
-<h3 align="center">kitty</h3>
+<h1 align="center">kitty</h1>
 
-<p align="center">
-  <a href="https://github.com/vroslmend/kitty-agent/actions/workflows/ci.yml"><img src="https://github.com/vroslmend/kitty-agent/actions/workflows/ci.yml/badge.svg" alt="CI status"></a>
-</p>
+<div align="center">
+  <p>The on-site agent for <a href="https://ammarhassan.dev">ammarhassan.dev</a>.</p>
 
-<p align="center">
-  A small on-site agent, live on <a href="https://ammarhassan.dev">ammarhassan.dev</a>.<br>
-  It answers questions about the work, the writing, the person behind them, and what is happening lately.
-</p>
+  <p>A LangGraph tool-calling agent behind a FastAPI server,<br>streaming its steps to the kitty widget in the portfolio.</p>
 
-Kitty is a hand-built LangGraph tool-calling loop behind a FastAPI service. It
-streams its decisions and answer to a quiet panel in the portfolio, remembers a
-conversation through Postgres checkpoints, and can stop mid-run to clarify an
-ambiguous request.
+  <p>Retrieval is one of its tools, not the shape of the program.</p>
 
-Retrieval is one of its tools, not the shape of the program.
-
-## What makes it an agent
-
-The model is given a set of narrow tools and decides what a question needs. It
-may answer directly, call one tool, combine several, or pause and ask the visitor
-to choose between valid interpretations. Tool results return to the model through
-the same graph until it has enough grounded information to answer.
-
-That distinction matters here:
-
-- a project question reads the baked portfolio data;
-- a question about an opinion searches the writing index;
-- "take me there" asks the navigation tool for a real route;
-- "what has he pushed lately?" calls GitHub rather than treating project data as
-  current activity;
-- an ambiguous reference can interrupt the graph and resume on the same thread;
-- "this essay" resolves from a server-validated page route, then still searches
-  the essay before making claims about it.
+  <p><a href="https://github.com/vroslmend/kitty-agent/actions/workflows/ci.yml"><img src="https://github.com/vroslmend/kitty-agent/actions/workflows/ci.yml/badge.svg" alt="CI status"></a></p>
+</div>
 
 ## Architecture
 
@@ -104,6 +80,24 @@ Run the graph directly, without the API:
 
 It prints each decision as it happens, which makes a wrong tool choice visible
 instead of burying it inside a plausible final answer.
+
+## What makes it an agent
+
+The model is given a set of narrow tools and decides what a question needs. It
+may answer directly, call one tool, combine several, or pause and ask the visitor
+to choose between valid interpretations. Tool results return to the model through
+the same graph until it has enough grounded information to answer.
+
+That distinction matters here:
+
+- a project question reads the baked portfolio data;
+- a question about an opinion searches the writing index;
+- "take me there" asks the navigation tool for a real route;
+- "what has he pushed lately?" calls GitHub rather than treating project data as
+  current activity;
+- an ambiguous reference can interrupt the graph and resume on the same thread;
+- "this essay" resolves from a server-validated page route, then still searches
+  the essay before making claims about it.
 
 ## Tools
 
