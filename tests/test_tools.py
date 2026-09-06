@@ -94,7 +94,8 @@ def test_suggest_navigation_finds_a_static_page() -> None:
 
 
 def test_suggest_navigation_finds_an_essay_by_words_in_its_title() -> None:
-    assert "/writing/visitor-counter" in suggest_navigation.invoke({"topic": "visitor counter"})
+    result = suggest_navigation.invoke({"topic": "visitor counter"})
+    assert result.endswith("/writing/visitor-counter")
 
 
 def test_suggest_navigation_returns_external_links() -> None:

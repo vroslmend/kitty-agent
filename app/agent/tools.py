@@ -10,6 +10,7 @@ raising. The model can relay "GitHub is not answering" to a visitor; it cannot
 do anything useful with a traceback.
 """
 
+import re
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -27,6 +28,13 @@ TIMEOUT = httpx.Timeout(8.0, connect=4.0)
 
 GITHUB_API = "https://api.github.com"
 AMMAR_TIMEZONE = ZoneInfo("Asia/Karachi")
+
+
+def _keyword_matches(query: str, keyword: str) -> bool:
+    """Match navigation keywords as words, never arbitrary substrings."""
+    query_words = set(re.findall(r"[a-z0-9]+", query.lower()))
+    keyword_words = re.findall(r"[a-z0-9]+", keyword.lower())
+    return bool(keyword_words) and all(word in query_words for word in keyword_words)
 
 
 def _current_year() -> int:
@@ -136,7 +144,7 @@ def suggest_navigation(topic: str) -> str:
             destinations.append((page["route"], f"the essay {page['title']!r}", keywords))
 
     for path, label, keywords in destinations:
-        if any(k in query for k in keywords):
+        if any(_keyword_matches(query, keyword) for keyword in keywords):
             return f"{label}: {path}"
 
     routes = ", ".join(path for path, _, _ in destinations)
