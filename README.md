@@ -273,9 +273,9 @@ The deterministic suite never calls the model or the network:
 .\.venv\Scripts\python.exe -m pytest -q
 ```
 
-The current gate contains 84 tests covering graph routing, stream events,
-interrupt resume, tools, rate limiting, database behavior, request validation,
-and the evaluation harness.
+The deterministic gate covers graph routing, stream events, interrupt resume,
+tools, rate limiting, database behavior, request validation, and the evaluation
+harness.
 
 ## Configuration
 
