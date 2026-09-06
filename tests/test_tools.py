@@ -6,6 +6,8 @@ sentence the model can relay, not a traceback: that is golden case gh-05, and
 it is the whole reason get_github_activity is in the tool set.
 """
 
+from types import SimpleNamespace
+
 import httpx
 import pytest
 
@@ -16,6 +18,7 @@ from app.agent.tools import (
     get_now_playing,
     get_profile,
     list_projects,
+    search_writing,
     suggest_navigation,
 )
 
@@ -105,6 +108,28 @@ def test_suggest_navigation_returns_external_links() -> None:
 def test_suggest_navigation_admits_when_it_has_nothing() -> None:
     result = suggest_navigation.invoke({"topic": "his kubernetes cluster"})
     assert "Nothing on the site matches" in result
+
+
+@pytest.mark.asyncio
+async def test_search_writing_uses_current_baked_title(monkeypatch) -> None:
+    async def fake_search(query: str, limit: int = 4) -> list[dict]:
+        return [
+            {
+                "route": "/writing/kitty",
+                "title": "the old Kitty title",
+                "content": "A passage from the essay.",
+            }
+        ]
+
+    monkeypatch.setattr(
+        tool_module, "get_settings", lambda: SimpleNamespace(database_url="configured")
+    )
+    monkeypatch.setattr(tool_module, "search", fake_search)
+
+    result = await search_writing.coroutine("kitty")
+
+    assert "From 'a quiet cat, with a complicated backend' (/writing/kitty):" in result
+    assert "the old Kitty title" not in result
 
 
 def test_profile_returns_public_experience() -> None:

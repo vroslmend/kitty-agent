@@ -312,7 +312,11 @@ async def search_writing(query: str) -> str:
 
     if not rows:
         return f"Nothing in his writing matches {query!r}."
-    passages = [f"From {r['title']!r} ({r['route']}):\n{r['content']}" for r in rows]
+    current_titles = {page["route"]: page["title"] for page in pages()}
+    passages = [
+        f"From {current_titles.get(r['route'], r['title'])!r} ({r['route']}):\n{r['content']}"
+        for r in rows
+    ]
     return "\n\n".join(passages)
 
 
