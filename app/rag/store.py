@@ -1,8 +1,8 @@
 """The vector store: schema, embedding, and similarity search.
 
 Written directly against psycopg rather than through a vector-store library.
-The corpus is three essays, the pool is already configured correctly for Neon's
-pgbouncer endpoint, and a library would bring its own connection handling that
+The corpus is intentionally small, the pool is already configured correctly for
+Neon's pgbouncer endpoint, and a library would bring its own connection handling that
 would need the same treatment. Similarity search over a table this small is a
 sequential scan, and that is the right answer at this size.
 """
