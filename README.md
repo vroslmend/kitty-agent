@@ -142,7 +142,7 @@ boundary is the portfolio and its public sources.
 
 ## Evaluation
 
-`evals/dataset.jsonl` contains 67 golden cases across direct answers, every tool
+`evals/dataset.jsonl` contains 68 golden cases across direct answers, every tool
 boundary, multi-tool requests, page context, clarification, conversation, prompt
 injection, unsupported claims, invented links, and controlled upstream failure.
 

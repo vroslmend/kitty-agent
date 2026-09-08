@@ -23,6 +23,19 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - name: Check out portfolio content source
+        uses: actions/checkout@v7
+        with:
+          repository: vroslmend/portfolio-v2
+          path: _portfolio
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Verify portfolio snapshot is current
+        run: node scripts/sync_site_content.mjs --check "$GITHUB_WORKSPACE/_portfolio"
+
       - uses: actions/setup-python@v7
         with:
           # Match the Dockerfile, so this tests what ships.

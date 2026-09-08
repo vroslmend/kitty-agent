@@ -232,10 +232,13 @@ async def get_github_activity(limit: int = 5) -> str:
 def get_profile(sections: list[str] | None = None) -> str:
     """Look up Ammar's public background, experience, education and skills.
 
-    Use this for where he worked, what he studied, technologies he knows, a
-    background summary, whether he is available for work, or how to contact
-    him. Pass one or more of: overview, experience, education, skills,
-    availability, contact. Leave sections out for a concise full overview.
+    Use this for where he worked, including client and freelance experience,
+    what he studied, technologies he knows, a background summary, whether he
+    is available for work, or how to contact him. Use it together with
+    list_projects when someone asks what kind of work he can do or what
+    evidence supports it. Pass one or more of: overview, experience,
+    education, skills, availability, contact. Leave sections out for a concise
+    full overview.
 
     Use list_projects for evidence of what he has built, search_writing for his
     views, and get_github_activity for what he has pushed lately.

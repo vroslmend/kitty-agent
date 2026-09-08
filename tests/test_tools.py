@@ -133,27 +133,39 @@ async def test_search_writing_uses_current_baked_title(monkeypatch) -> None:
 
 
 def test_profile_returns_public_experience() -> None:
+    data = tool_module.profile()
     result = get_profile.invoke({"sections": ["experience"]})
 
-    assert "Punjab Safe Cities Authority" in result
-    assert "Web Development Intern" in result
+    assert data["experience"]
+    for item in data["experience"]:
+        assert item["company"] in result
+        assert item["role"] in result
+        assert item["period"] in result
+        assert item["description"] in result
 
 
 def test_profile_returns_education_and_skills() -> None:
+    data = tool_module.profile()
     result = get_profile.invoke({"sections": ["education", "skills"]})
 
-    assert "BS Software Engineering" in result
-    assert "COMSATS University" in result
-    assert "Python" in result
-    assert "Terraform" in result
+    assert data["education"]
+    assert data["toolbox"]
+    for item in data["education"]:
+        assert item["degree"] in result
+        assert item["school"] in result
+    for skill in data["toolbox"]:
+        assert skill in result
 
 
 def test_profile_returns_only_public_contact_details() -> None:
+    identity = tool_module.profile()["site"]
     result = get_profile.invoke({"sections": ["availability", "contact"]})
 
-    assert "open to work" in result
-    assert "ammarhassan.amr@gmail.com" in result
-    assert "github.com/vroslmend" in result
+    assert identity["now"] in result
+    assert identity["email"] in result
+    assert identity["links"]["github"] in result
+    assert identity["links"]["linkedin"] in result
+    assert identity["links"]["resume"] in result
 
 
 @pytest.mark.parametrize(
