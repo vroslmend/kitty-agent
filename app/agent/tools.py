@@ -129,12 +129,15 @@ def suggest_navigation(topic: str) -> str:
     links = site()["links"]
 
     destinations: list[tuple[str, str, list[str]]] = [
-        ("/", "the home page", ["home", "start", "index", "main", "landing"]),
         (
             "/work-with-me",
             "work with him",
             [
                 "work with me",
+                "work with him",
+                "work with Ammar",
+                "working with him",
+                "working with Ammar",
                 "client work",
                 "hire",
                 "hiring",
@@ -144,6 +147,7 @@ def suggest_navigation(topic: str) -> str:
                 "services",
             ],
         ),
+        ("/", "the home page", ["home", "start", "index", "main", "landing"]),
         ("/about", "about him", ["about", "bio", "who", "background", "himself"]),
         ("/work", "his work and projects", ["work", "projects", "portfolio", "built"]),
         ("/writing", "his writing", ["writing", "essays", "blog", "posts", "articles"]),

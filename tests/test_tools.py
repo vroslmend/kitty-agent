@@ -94,11 +94,23 @@ def test_list_projects_says_so_when_nothing_matches() -> None:
 
 def test_suggest_navigation_finds_a_static_page() -> None:
     assert "/photos" in suggest_navigation.invoke({"topic": "where are the photos"})
+    assert suggest_navigation.invoke({"topic": "home"}).endswith("/")
 
 
 @pytest.mark.parametrize(
     "topic",
-    ["work with me", "client work", "hire Ammar", "hiring", "collaboration", "freelance work"],
+    [
+        "work with me",
+        "client work",
+        "hire Ammar",
+        "hiring",
+        "collaboration",
+        "freelance work",
+        "work with Ammar",
+        "work with him",
+        "start hiring him",
+        "start a collaboration",
+    ],
 )
 def test_suggest_navigation_routes_client_work_before_general_work(topic: str) -> None:
     assert suggest_navigation.invoke({"topic": topic}).endswith("/work-with-me")
