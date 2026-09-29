@@ -115,7 +115,8 @@ def suggest_navigation(topic: str) -> str:
 
     Use this when a visitor asks where something is or asks to be taken
     somewhere: the photos, the writing, a particular essay, the resume, his
-    GitHub or LinkedIn.
+    GitHub or LinkedIn. Client-work, hiring and collaboration requests go to
+    /work-with-me; general project browsing goes to /work.
 
     This points at a destination, it does not answer the question. If they
     asked what he has written about, use search_writing instead; if they asked
@@ -128,6 +129,24 @@ def suggest_navigation(topic: str) -> str:
     links = site()["links"]
 
     destinations: list[tuple[str, str, list[str]]] = [
+        (
+            "/work-with-me",
+            "work with him",
+            [
+                "work with me",
+                "work with him",
+                "work with Ammar",
+                "working with him",
+                "working with Ammar",
+                "client work",
+                "hire",
+                "hiring",
+                "collaborate",
+                "collaboration",
+                "freelance",
+                "services",
+            ],
+        ),
         ("/", "the home page", ["home", "start", "index", "main", "landing"]),
         ("/about", "about him", ["about", "bio", "who", "background", "himself"]),
         ("/work", "his work and projects", ["work", "projects", "portfolio", "built"]),
@@ -232,10 +251,13 @@ async def get_github_activity(limit: int = 5) -> str:
 def get_profile(sections: list[str] | None = None) -> str:
     """Look up Ammar's public background, experience, education and skills.
 
-    Use this for where he worked, what he studied, technologies he knows, a
-    background summary, whether he is available for work, or how to contact
-    him. Pass one or more of: overview, experience, education, skills,
-    availability, contact. Leave sections out for a concise full overview.
+    Use this for where he worked, including client and freelance experience,
+    what he studied, technologies he knows, a background summary, whether he
+    is available for work, or how to contact him. Use it together with
+    list_projects when someone asks what kind of work he can do or what
+    evidence supports it. Pass one or more of: overview, experience,
+    education, skills, availability, contact. Leave sections out for a concise
+    full overview.
 
     Use list_projects for evidence of what he has built, search_writing for his
     views, and get_github_activity for what he has pushed lately.

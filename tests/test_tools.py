@@ -94,6 +94,31 @@ def test_list_projects_says_so_when_nothing_matches() -> None:
 
 def test_suggest_navigation_finds_a_static_page() -> None:
     assert "/photos" in suggest_navigation.invoke({"topic": "where are the photos"})
+    assert suggest_navigation.invoke({"topic": "home"}).endswith("/")
+
+
+@pytest.mark.parametrize(
+    "topic",
+    [
+        "work with me",
+        "client work",
+        "hire Ammar",
+        "hiring",
+        "collaboration",
+        "freelance work",
+        "work with Ammar",
+        "work with him",
+        "start hiring him",
+        "start a collaboration",
+    ],
+)
+def test_suggest_navigation_routes_client_work_before_general_work(topic: str) -> None:
+    assert suggest_navigation.invoke({"topic": topic}).endswith("/work-with-me")
+
+
+@pytest.mark.parametrize("topic", ["his work", "projects", "portfolio"])
+def test_suggest_navigation_keeps_project_browsing_on_work(topic: str) -> None:
+    assert suggest_navigation.invoke({"topic": topic}).endswith("/work")
 
 
 def test_suggest_navigation_finds_an_essay_by_words_in_its_title() -> None:
@@ -133,27 +158,39 @@ async def test_search_writing_uses_current_baked_title(monkeypatch) -> None:
 
 
 def test_profile_returns_public_experience() -> None:
+    data = tool_module.profile()
     result = get_profile.invoke({"sections": ["experience"]})
 
-    assert "Punjab Safe Cities Authority" in result
-    assert "Web Development Intern" in result
+    assert data["experience"]
+    for item in data["experience"]:
+        assert item["company"] in result
+        assert item["role"] in result
+        assert item["period"] in result
+        assert item["description"] in result
 
 
 def test_profile_returns_education_and_skills() -> None:
+    data = tool_module.profile()
     result = get_profile.invoke({"sections": ["education", "skills"]})
 
-    assert "BS Software Engineering" in result
-    assert "COMSATS University" in result
-    assert "Python" in result
-    assert "Terraform" in result
+    assert data["education"]
+    assert data["toolbox"]
+    for item in data["education"]:
+        assert item["degree"] in result
+        assert item["school"] in result
+    for skill in data["toolbox"]:
+        assert skill in result
 
 
 def test_profile_returns_only_public_contact_details() -> None:
+    identity = tool_module.profile()["site"]
     result = get_profile.invoke({"sections": ["availability", "contact"]})
 
-    assert "open to work" in result
-    assert "ammarhassan.amr@gmail.com" in result
-    assert "github.com/vroslmend" in result
+    assert identity["now"] in result
+    assert identity["email"] in result
+    assert identity["links"]["github"] in result
+    assert identity["links"]["linkedin"] in result
+    assert identity["links"]["resume"] in result
 
 
 @pytest.mark.parametrize(

@@ -12,7 +12,7 @@
       "linkedin": "https://www.linkedin.com/in/ammar-hassan-8aa48a233/",
       "resume": "/resume.pdf"
     },
-    "now": "final year, going deep on python and ai engineering, open to work"
+    "now": "working across web and ai · open to roles and client work"
   },
   "projects": [
     {
@@ -39,7 +39,7 @@
     },
     {
       "slug": "kitty-agent",
-      "name": "kitty",
+      "name": "Kitty",
       "year": "2026",
       "tagline": "on-site portfolio agent",
       "description": "An on-site agent for this portfolio that answers questions about my work, writing and background. A custom LangGraph tool loop coordinates its tools; FastAPI streams each step, and an evaluation suite checks routing and answer quality. Postgres keeps conversations durable, while bounded retries and a warm-on-load health check keep the public widget responsive.",
@@ -59,6 +59,29 @@
         "github": "https://github.com/vroslmend/kitty-agent"
       },
       "image": "/images/projects/kitty.webp",
+      "featured": true
+    },
+    {
+      "slug": "replywork",
+      "name": "Replywork",
+      "year": "2026",
+      "tagline": "the work behind the reply",
+      "description": "A backend for support inboxes like Crisp and Chatwoot that answers product questions from approved records instead of from whatever the model remembers. Incoming messages are verified and queued so nothing gets lost or answered twice, and a person can take over a conversation and hand it back. It's a reference build that runs locally rather than a hosted product.",
+      "evidence": [
+        "The model only extracts a bounded request. Local code writes the reply from stored facts in PostgreSQL, so it can't invent a price, change stock or place an order.",
+        "Each webhook is checked against its signature and admitted once, in the same transaction that queues it. A worker with visibility timeouts and audit records works through the queue.",
+        "A human takeover pauses automation durably, and only a trusted resume control hands the conversation back."
+      ],
+      "stack": [
+        "TypeScript",
+        "Fastify",
+        "PostgreSQL",
+        "Drizzle",
+        "Gemini"
+      ],
+      "links": {
+        "github": "https://github.com/vroslmend/replywork"
+      },
       "featured": true
     },
     {
@@ -126,7 +149,7 @@
         "github": "https://github.com/vroslmend/next-ai-saas-app"
       },
       "image": "/images/projects/imaginify.webp",
-      "featured": true
+      "featured": false
     },
     {
       "slug": "karting-analysis",
@@ -260,6 +283,12 @@
   ],
   "experience": [
     {
+      "company": "Self-Employed",
+      "role": "Freelance Full-Stack Developer",
+      "period": "2025 – present",
+      "description": "Built responsive websites and applications with React, Next.js, Astro, Node.js and Python, including APIs, authentication and database-backed features. Handled deployment with Cloudflare, AWS and GitHub Actions, working directly with clients from requirements through review and delivery."
+    },
+    {
       "company": "Punjab Safe Cities Authority",
       "role": "Web Development Intern",
       "period": "jun – aug 2024",
@@ -270,7 +299,7 @@
     {
       "school": "COMSATS University, Lahore",
       "degree": "BS Software Engineering",
-      "period": "2021 – present"
+      "period": "2021 – 2025"
     },
     {
       "school": "International School Lahore",
@@ -281,8 +310,9 @@
   "toolbox": [
     "TypeScript",
     "React / Next.js",
+    "Astro",
     "Node.js",
-    "Express",
+    "Express / Fastify",
     "Socket.IO",
     "XState",
     "Tailwind CSS",
@@ -295,6 +325,7 @@
     "Pandas / NumPy / Matplotlib",
     "MongoDB + Vector Search",
     "Postgres / pgvector",
+    "Drizzle",
     "Gemini API",
     "LLM evals",
     "Spotify API",
@@ -305,6 +336,7 @@
     "Terraform",
     "GitHub Actions",
     "Vercel",
+    "Cloudflare",
     "Git / Linux"
   ],
   "pages": [
@@ -321,7 +353,12 @@
     {
       "route": "/work",
       "title": "work",
-      "description": "Selected projects: CUI Central, kitty, Check!, Cloud Visitor Counter, Imaginify, and Karting Analysis."
+      "description": "Selected projects: CUI Central, Kitty, Replywork, Check!, Cloud Visitor Counter, and Karting Analysis."
+    },
+    {
+      "route": "/work-with-me",
+      "title": "work with me",
+      "description": "Client work across websites, web applications, AI assistants, backends and automation."
     },
     {
       "route": "/writing",
