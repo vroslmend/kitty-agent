@@ -96,6 +96,19 @@ def test_suggest_navigation_finds_a_static_page() -> None:
     assert "/photos" in suggest_navigation.invoke({"topic": "where are the photos"})
 
 
+@pytest.mark.parametrize(
+    "topic",
+    ["work with me", "client work", "hire Ammar", "hiring", "collaboration", "freelance work"],
+)
+def test_suggest_navigation_routes_client_work_before_general_work(topic: str) -> None:
+    assert suggest_navigation.invoke({"topic": topic}).endswith("/work-with-me")
+
+
+@pytest.mark.parametrize("topic", ["his work", "projects", "portfolio"])
+def test_suggest_navigation_keeps_project_browsing_on_work(topic: str) -> None:
+    assert suggest_navigation.invoke({"topic": topic}).endswith("/work")
+
+
 def test_suggest_navigation_finds_an_essay_by_words_in_its_title() -> None:
     result = suggest_navigation.invoke({"topic": "visitor counter"})
     assert result.endswith("/writing/visitor-counter")

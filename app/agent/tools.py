@@ -115,7 +115,8 @@ def suggest_navigation(topic: str) -> str:
 
     Use this when a visitor asks where something is or asks to be taken
     somewhere: the photos, the writing, a particular essay, the resume, his
-    GitHub or LinkedIn.
+    GitHub or LinkedIn. Client-work, hiring and collaboration requests go to
+    /work-with-me; general project browsing goes to /work.
 
     This points at a destination, it does not answer the question. If they
     asked what he has written about, use search_writing instead; if they asked
@@ -129,6 +130,20 @@ def suggest_navigation(topic: str) -> str:
 
     destinations: list[tuple[str, str, list[str]]] = [
         ("/", "the home page", ["home", "start", "index", "main", "landing"]),
+        (
+            "/work-with-me",
+            "work with him",
+            [
+                "work with me",
+                "client work",
+                "hire",
+                "hiring",
+                "collaborate",
+                "collaboration",
+                "freelance",
+                "services",
+            ],
+        ),
         ("/about", "about him", ["about", "bio", "who", "background", "himself"]),
         ("/work", "his work and projects", ["work", "projects", "portfolio", "built"]),
         ("/writing", "his writing", ["writing", "essays", "blog", "posts", "articles"]),
